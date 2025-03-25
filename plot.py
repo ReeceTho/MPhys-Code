@@ -9,6 +9,7 @@ import tkinter as tk
 from matplotlib.patches import Ellipse
 from scipy.stats import chi2
 from scipy.spatial.distance import mahalanobis
+from itertools import combinations
 
 # Specify the path to your file
 file_path = 'scan.dat.gz' 
@@ -39,7 +40,6 @@ if 'dependent_variables' in LZ:
 nf["Mh+"] = nf["DMP"] + nf["MD1"]
 nf["Mh2"] = nf["DM3"] + nf["DMP"] + nf["MD1"]
 
-print(nf)
 def fa(x):
     y = -5 + (12*np.log(x))
     return y
@@ -65,15 +65,7 @@ nf["S"] = ((1/(72*np.pi)) * (1/((((nf["Mh2"]/nf["Mh+"])**2) - ((nf["MD1"]/nf["Mh
 nf["T"] = ((1/(32*(np.pi**2)*alpha*(nu**2)))
             * (fc((nf["Mh+"]**2),(nf["Mh2"]**2)) + fc((nf["Mh+"]**2),(nf["MD1"]**2)) - fc((nf["Mh2"]**2),(nf["MD1"]**2))))
 
-print("S TEST:", ((1/(72*np.pi)) * (1/((((443.41/72.13)**2) - ((50/72.13)**2))**3))
-            * ((((443.41/72.13)**6) * fa((443.41/72.13))) - (((50/72.13)**6)
-            * fa((50/72.13))) + (9 * ((443.41/72.13)**2) * ((50/72.13)**2 )
-            * ((((443.41/72.13)**2) * fb((443.41/72.13))) - (((50/72.13)**2)
-                                                                        * fb((50/72.13))))))))
-print("T TEST:", ((1/(32*(np.pi**2)*alpha*(nu**2)))
-            * (f_c((72.13**2),(443.41**2)) + f_c((72.13**2),(50**2)) - f_c((443.41**2),(50**2)))))
 
-print(nf)
 S_central, S_error = 0.06, 0.09
 T_central, T_error = 0.1, 0.07
 Corr_ST = 0.91  #correlation between S and T
@@ -81,7 +73,7 @@ cov_matrix = np.array([[S_error**2, Corr_ST * S_error * T_error], [Corr_ST * S_e
 def confidence_ellipse(mean, cov, ax, n_std=1, **kwargs):
     eigvals, eigvecs = np.linalg.eigh(cov)
     angle = np.degrees(np.arctan2(*eigvecs[:, 0][::-1]))
-    scale_factor = np.sqrt(chi2.ppf({1: 0.68, 2: 0.95}[n_std], df=2))
+    scale_factor = np.sqrt(chi2.ppf({1: 0.68, 2: 0.964}[n_std], df=2))
     width, height = 2 * np.sqrt(eigvals) * scale_factor
     ellipse = Ellipse(xy=mean, width=width, height=height, angle=angle, **kwargs)
     ax.add_patch(ellipse)
@@ -105,12 +97,12 @@ variableAxis = {
     'T' : r"EWPT T"
 }
 
-cutTest = (nf['DM3'] < 200) & (nf['DM3'] > -200)
-cutTest2 = (nf['DMP'] < 200) & (nf['DMP'] > -200)
-cutTest3 = (nf["Mh+"] < 1000) & (nf["Mh2"] < 1000)
+#cutTest = (nf['DM3'] < 200) & (nf['DM3'] > -200)
+#cutTest2 = (nf['DMP'] < 200) & (nf['DMP'] > -200)
+#cutTest3 = (nf["Mh+"] < 1000) & (nf["Mh2"] < 1000)
 #cutTest4 = (nf["S"] < 0.24) & (nf["S"] > -0.12) & (nf["T"] < 0.24) & (nf["T"] > -0.04)
-nf['DM3'] = nf["DM3"]*-1
-nf = nf[cutTest & cutTest2 & cutTest3]
+#nf['DM3'] = nf["DM3"]*-1
+#nf = nf[cutTest & cutTest2 & cutTest3]
 
 # Filter the DataFrame to include rows where PvalDD > 0.05
 cutDD=(nf['PvalDD'] > 0.046) # this means it matches to a percentage of 4.6% (2 sigma)
@@ -120,108 +112,151 @@ cutBAO=(nf['Omegah2'] <= 0.12206) & (nf['Omegah2'] >= 0.1166) # based on BAO dat
 #MAKE ONE WITH 10%
 cutCMB=(nf['CMB_ID'] < 1)  
 cutLZ=(nf['protonSI'] < np.interp(nf['MD1'], x_values, y_data["limit"])) #this is to get all the points beneath the line
-#cutEW = (np.array([mahalanobis([s, t], [S_central, T_central], cov_inv) 
-#                   for s, t in zip(nf['S'], nf['T'])]) <= np.sqrt(chi2.ppf(0.964, df=2)))
+cutEW = (np.array([mahalanobis([s, t], [S_central, T_central], cov_inv) for s, t in zip(nf['S'], nf['T'])]) <= np.sqrt(chi2.ppf(0.964, df=2)))
 #function LZ_2024, call it, compare number of exclusion.
 
-
-dd = nf[cutDD]
-om = nf[cutOM]
-cmb = nf[cutCMB]
-lz = nf[cutLZ]
-#ew = nf[cutEW]
-
-cut_DD_OM = (cutDD & cutOM)
-cut_DD_CMB = (cutDD & cutCMB)
-cut_DD_LZ = (cutDD & cutLZ)
-cut_OM_CMB = (cutOM & cutCMB)
-cut_OM_LZ = (cutOM & cutLZ)
-cut_CMB_LZ = (cutCMB & cutLZ)
-cut_DD_OM_CMB = (cutDD & cutOM & cutCMB)
-cut_DD_OM_LZ = (cutDD & cutOM & cutLZ)
-cut_DD_CMB_LZ = (cutDD & cutCMB & cutLZ)
-cut_OM_CMB_LZ = (cutOM & cutCMB & cutLZ)
-cut_tot = (cutDD & cutOM & cutCMB & cutLZ)
-cut_tot_PLA =(cutDD & cutOM & cutCMB & cutLZ & cutPLA)
-cut_tot_BAO = (cutDD & cutOM & cutCMB & cutLZ & cutBAO)
-ddom = nf[cut_DD_OM]
-ddcmb = nf[cut_DD_CMB]
-ddlz = nf[cut_DD_LZ]
-omcmb = nf[cut_OM_CMB]
-omlz = nf[cut_OM_LZ]
-cmblz = nf[cut_CMB_LZ]
-ddomcmb = nf[cut_DD_OM_CMB]
-ddomlz = nf[cut_DD_OM_LZ]
-ddcmblz = nf[cut_DD_CMB_LZ]
-omcmblz = nf[cut_OM_CMB_LZ]
-tot = nf[cut_tot]
-totpla = nf[cut_tot_PLA]
-totbao = nf[cut_tot_BAO]
-
-cutList = [nf, dd, om, cmb, lz, ddom, ddcmb, omcmb, ddomcmb, ddomlz, ddcmblz, omcmblz, tot, totpla, totbao]
-constraint_titles = {
-    id(nf) : 'Unfiltered Data',
-    id(dd) : 'Direct Detection of Dark Matter >5% P-value',
-    id(om) : 'Planck Ωh² Constraint',
-    id(cmb): 'CMB Constraint',
-    id(lz) : 'LUX-ZEPLIN 2024',
-#    id(ew) : 'Electroweak Precision Constraint',
-    id(ddom) : 'Direct Detection + Planck Ωh² Constraints',
-    id(ddcmb) : 'Direct Detection + CMB Constraints',
-    id(ddlz) : 'Direct Detection + LZ Constraints',
-    id(omcmb) : 'Planck Ωh² + CMB Constraints',
-    id(omlz) : 'Planck Ωh² + LZ Constraints',
-    id(cmblz) : 'CMB + LZ Constraints',
-    id(ddomcmb) : "ddomcmb - Direct Detection + Planck Ωh² + CMB",
-    id(ddomlz) : "ddomlz - Direct Detection + Planck Ωh² + LZ",
-    id(ddcmblz) : "ddcmblz - Direct Detection + CMB + LZ",
-    id(omcmblz) : "omcmblz - Planck Ωh² + CMB + LZ",
-    id(tot): 'All Constraints (with External Sources of DM) Applied',
-    id(totpla): 'All Constraints (within Planck) Applied',
-    id(totbao): 'All Constraints (within Planck + BAO) Applied'
+# Define individual cuts (excluding PLA and BAO as special cases)
+individualCuts = {
+    "dd": cutDD,
+    "om": cutOM,
+    "cmb": cutCMB,
+    "lz": cutLZ,
+    "ew": cutEW,
 }
-variableNames = {
-    id(nf) : 'nf',
-    id(dd) : 'dd',
-    id(om) : 'om',
-    id(cmb): 'cmb',
-    id(lz) : 'lz',
-#    id(ew) : 'ew',
-    id(ddom) : 'ddom',
-    id(ddcmb) : 'ddcmb',
-    id(ddlz) : 'ddlz',
-    id(omcmb) : 'omcmb',
-    id(omlz) : 'omlz',
-    id(cmblz) : 'cmblz',
-    id(ddomcmb) : 'ddomcmb',
-    id(ddomlz) : 'ddomlz',
-    id(ddcmblz) : 'ddcmblz',
-    id(omcmblz) : 'omcmblz',
-    id(tot): 'tot',
-    id(totpla): 'totpla',
-    id(totbao): 'totbao'
+
+# Dictionary to store cut masks and filtered data
+cutList = {}
+filtered_data = {}
+
+# Generate all possible cut combinations
+for r in range(1, len(individualCuts) + 1):  
+    for combo in combinations(individualCuts.keys(), r):
+        cut_name = "".join(combo)
+        cutList[cut_name] = individualCuts[combo[0]]
+        for key in combo[1:]:
+            cutList[cut_name] &= individualCuts[key]
+        filtered_data[cut_name] = nf[cutList[cut_name]]
+
+# Special cases for tot, totpla, and totbao
+cutList["tot"] = cutList["ddomcmblzew"]
+filtered_data["tot"] = nf[cutList["tot"]]
+del cutList["ddomcmblzew"]
+
+cutList["totpla"] = cutList["tot"] & cutPLA
+filtered_data["totpla"] = nf[cutList["totpla"]]
+
+cutList["totbao"] = cutList["tot"] & cutBAO
+filtered_data["totbao"] = nf[cutList["totbao"]]
+
+
+cut_titles = {
+    "dd": "Direct Detection of Dark Matter >5% P-value",
+    "om": "Planck Ωh² Constraint",
+    "cmb": "CMB Constraint",
+    "lz": "LUX-ZEPLIN 2024",
+    "ew": "Electroweak Precision"
 }
-dependents = {
-    id(nf) : [],
-    id(dd) : [nf],
-    id(om) : [nf],
-    id(cmb): [nf],
-    id(lz) : [nf],
-#    id(ew) : [nf],
-    id(ddom) : [dd, om],
-    id(ddcmb) : [dd, cmb],
-    id(ddlz) : [dd, lz],
-    id(omcmb) : [om, cmb],
-    id(omlz) : [om, lz],
-    id(cmblz) : [cmb, lz],
-    id(ddomcmb) : [ddom, ddcmb, omcmb],
-    id(ddomlz) : [ddom, ddlz, omlz],
-    id(ddcmblz) : [ddcmb, ddlz, cmblz],
-    id(omcmblz) : [omcmb, omlz, cmblz],
-    id(tot): [ddomcmb, ddomlz, ddcmblz, omcmblz, nf],
-    id(totpla): [tot],
-    id(totbao): [tot]
+
+# Initialize constraint_titles with the unfiltered data
+constraint_titles = {id(nf): "Unfiltered Data"}
+
+# Handle special cases first
+constraint_titles[id(filtered_data["tot"])] = "All Constraints (with External Sources of DM) Applied"
+constraint_titles[id(filtered_data["totpla"])] = "All Constraints (within Planck) Applied"
+constraint_titles[id(filtered_data["totbao"])] = "All Constraints (within Planck + BAO) Applied"
+
+# Generate titles for each cut combination
+for cut_name, data in filtered_data.items():
+    # Skip special cases already handled
+    if cut_name in ["tot", "totpla", "totbao"]:
+        continue  # These are already handled above
+
+    # Check if the cut_name is a combination of multiple constraints
+    cut_labels = []
+    
+    # If cut_name is a single constraint (not combined)
+    if cut_name in cut_titles:
+        constraint_titles[id(data)] = cut_titles[cut_name]
+    else:
+        # For combinations, split and look for individual constraints
+        for key in cut_titles.keys():
+            if key in cut_name:
+                cut_labels.append(cut_titles[key])
+        
+        # If there are multiple labels, create a combined title
+        if len(cut_labels) > 1:
+            constraint_titles[id(data)] = " + ".join(cut_labels) + " Constraints"
+        else:  # Single constraint case
+            constraint_titles[id(data)] = cut_titles[cut_name]
+
+# Initialize variableNames with the unfiltered data
+variableNames = {id(nf): "nf"}
+
+# Generate variable names dynamically based on filtered_data
+for cut_name, data in filtered_data.items():
+    variableNames[id(data)] = cut_name.lower()  # Keep the naming convention consistent
+
+# Special cases
+variableNames[id(filtered_data["tot"])] = "tot"
+variableNames[id(filtered_data["totpla"])] = "totpla"
+variableNames[id(filtered_data["totbao"])] = "totbao"
+
+# Initialize dependents dictionary with empty dependencies for unfiltered data
+dependents = {id(nf): []}
+
+# Define the basic cut names (for dependency checking)
+basic_cuts = {
+    "dd": filtered_data["dd"],
+    "om": filtered_data["om"],
+    "cmb": filtered_data["cmb"],
+    "lz": filtered_data["lz"],
+    "ew": filtered_data["ew"]
 }
+
+# Add dependencies for individual cuts (dd, om, cmb, etc.)
+for cut_name, data in filtered_data.items():
+    if cut_name in basic_cuts:  # For basic cuts like dd, om, cmb, etc.
+        dependents[id(data)] = [id(nf)]
+    else:  # For combined cuts, check which individual cuts form the combination
+        cut_dependencies = []
+        
+        # Check which basic cuts are included in the combination (check for substrings)
+        for key in basic_cuts:
+            if key in cut_name:  # If the cut_name contains the basic cut (substring check)
+                cut_dependencies.append(id(basic_cuts[key]))
+
+        # If the combination has dependencies on other cuts (basic or combined)
+        if len(cut_dependencies) > 0:
+            dependents[id(data)] = cut_dependencies
+
+# Handle the dependencies for combined cuts (like omcmblz, ddomcmb, etc.)
+for cut_name, data in filtered_data.items():
+    # If the cut is a combined cut (no spaces, continuous string of basic cuts)
+    if cut_name not in basic_cuts:  # If the cut is not a basic one, it's combined
+        cut_dependencies = []
+        
+        # Check for dependencies on basic cuts (look for substrings)
+        for key in basic_cuts:
+            if key in cut_name:  # If the basic cut is part of the combined cut
+                cut_dependencies.append(id(basic_cuts[key]))
+
+        # Add dependencies for other combined cuts involved in the current combined cut
+        for combined_cut in filtered_data:
+            if combined_cut != cut_name and combined_cut in cut_name:
+                cut_dependencies.append(id(filtered_data[combined_cut]))
+
+        # Store dependencies for the combined cut
+        dependents[id(data)] = cut_dependencies
+
+# Special cases for tot, totpla, and totbao (tot depends on everything)
+dependents[id(filtered_data["tot"])] = [id(cut) for cut in filtered_data.values()]
+dependents[id(filtered_data["totpla"])] = [id(filtered_data["tot"])]
+dependents[id(filtered_data["totbao"])] = [id(filtered_data["tot"])]
+
+
+
+
+
 
 
 # This function checks the rules to make the graph
@@ -274,7 +309,9 @@ def startPlot(cutList, x, y, z, i, j, k):
         plt.close()
         print("cut sample: \n", cut.sample(n=1))
         if len(dependents.get(id(cut))) > 0:
+            print(dependents.get(cut))
             for b in dependents.get(id(cut)):
+                print("Making: "+variableNames.get(id(cut))+"_"+variableNames.get(id(b))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf')
                 fig, ax = plt.subplots(figsize=(8, 6))
                 sc1 = makePlot(ax, b, x, y, z, k , 0)
                 sc2 = makePlot(ax, cut, x, y, z, k)
@@ -287,7 +324,7 @@ def startPlot(cutList, x, y, z, i, j, k):
                 plt.tight_layout()
 
                 # Save the plot to pdf format
-                print("Making: "+variableNames.get(id(cut))+"_"+variableNames.get(id(b))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf')
+                
                 plt.savefig(variableNames.get(id(cut))+"_"+variableNames.get(id(b))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
                 plt.close()
         
@@ -438,23 +475,23 @@ constraint_numbers = {
     ]
 }
 constraint_selected = {
-    "dd - Direct Detection of Dark Matter >5% P-value": dd,
-    "om - Planck Ωh²": dd,
-    "cmb - CMB": dd,
-    "lz - LUX-ZEPLIN 2024": lz,
-#    "ew - Electroweak Precision": ew,  
-    "ddom - Direct Detection + Planck Ωh²": ddom,
-    "ddcmb - Direct Detection + CMB": ddcmb,
-    "ddlz - Direct Detection + LZ": ddlz,
-    "omcmb - Planck Ωh² + CMB": omcmb,
-    "omlz - Planck Ωh² + LZ": omlz,
-    "cmblz - CMB + LZ": cmblz,
-    "ddomcmb - Direct Detection + Planck Ωh² + CMB": ddomcmb,
-    "ddomlz - Direct Detection + Planck Ωh² + LZ": ddomlz,
-    "ddcmblz - Direct Detection + CMB + LZ": ddcmblz,
-    "omcmblz - Planck Ωh² + CMB + LZ": omcmblz,
-    "tot - All constraints applied" : tot,
-    "totpla - All constrains + Planck" : totpla
+    "dd - Direct Detection of Dark Matter >5% P-value": filtered_data["dd"],
+    "om - Planck Ωh²": filtered_data["om"],
+    "cmb - CMB": filtered_data["cmb"],
+    "lz - LUX-ZEPLIN 2024": filtered_data["lz"],
+    "ew - Electroweak Precision": filtered_data["ew"],  
+    "ddom - Direct Detection + Planck Ωh²": filtered_data["ddom"],
+    "ddcmb - Direct Detection + CMB": filtered_data["ddcmb"],
+    "ddlz - Direct Detection + LZ": filtered_data["ddlz"],
+    "omcmb - Planck Ωh² + CMB": filtered_data["omcmb"],
+    "omlz - Planck Ωh² + LZ": filtered_data["omlz"],
+    "cmblz - CMB + LZ": filtered_data["cmblz"],
+    "ddomcmb - Direct Detection + Planck Ωh² + CMB": filtered_data["ddomcmb"],
+    "ddomlz - Direct Detection + Planck Ωh² + LZ": filtered_data["ddomlz"],
+    "ddcmblz - Direct Detection + CMB + LZ": filtered_data["ddcmblz"],
+    "omcmblz - Planck Ωh² + CMB + LZ": filtered_data["omcmblz"],
+    "tot - All constraints applied" : filtered_data["tot"],
+    "totpla - All constrains + Planck" : filtered_data["totpla"]
 }
 
 # Selected Constraints
@@ -464,7 +501,6 @@ constraintList = []
 axis_scale_frame = tk.Frame(root, bg="#2E2E2E")
 axis_scale_frame.pack(fill="both", expand=True)
 
-print(list(variables.keys()))
 # Axis selection variables
 x_axis = tk.StringVar(value=list(variables.keys())[0])
 y_axis = tk.StringVar(value=list(variables.keys())[1])

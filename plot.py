@@ -10,6 +10,7 @@ from matplotlib.patches import Ellipse
 from scipy.stats import chi2
 from scipy.spatial.distance import mahalanobis
 from itertools import combinations
+from collections import defaultdict
 
 # Specify the path to your file
 file_path = 'scan.dat.gz' 
@@ -141,12 +142,11 @@ for r in range(1, len(individualCuts) + 1):
 cutList["tot"] = cutList["ddomcmblzew"]
 filtered_data["tot"] = nf[cutList["tot"]]
 del cutList["ddomcmblzew"]
-
 cutList["totpla"] = cutList["tot"] & cutPLA
 filtered_data["totpla"] = nf[cutList["totpla"]]
-
 cutList["totbao"] = cutList["tot"] & cutBAO
 filtered_data["totbao"] = nf[cutList["totbao"]]
+#filtered_data takes the format "cutname":*df of that cut*
 
 
 cut_titles = {
@@ -162,8 +162,9 @@ constraint_titles = {id(nf): "Unfiltered Data"}
 
 # Handle special cases first
 constraint_titles[id(filtered_data["tot"])] = "All Constraints (with External Sources of DM) Applied"
-constraint_titles[id(filtered_data["totpla"])] = "All Constraints (within Planck) Applied"
-constraint_titles[id(filtered_data["totbao"])] = "All Constraints (within Planck + BAO) Applied"
+constraint_titles[id(filtered_data["totpla"])] = "All Constraints (with Planck) Applied"
+constraint_titles[id(filtered_data["totbao"])] = "All Constraints (with BAO) Applied"
+
 
 # Generate titles for each cut combination
 for cut_name, data in filtered_data.items():
@@ -188,6 +189,7 @@ for cut_name, data in filtered_data.items():
             constraint_titles[id(data)] = " + ".join(cut_labels) + " Constraints"
         else:  # Single constraint case
             constraint_titles[id(data)] = cut_titles[cut_name]
+
 
 # Initialize variableNames with the unfiltered data
 variableNames = {id(nf): "nf"}
@@ -249,15 +251,16 @@ for cut_name, data in filtered_data.items():
         dependents[id(data)] = cut_dependencies
 
 # Special cases for tot, totpla, and totbao (tot depends on everything)
-dependents[id(filtered_data["tot"])] = [id(cut) for cut in filtered_data.values()]
+dependents[id(["tot"])] = [id(cut) for cut in filtered_data.values()]
 dependents[id(filtered_data["totpla"])] = [id(filtered_data["tot"])]
 dependents[id(filtered_data["totbao"])] = [id(filtered_data["tot"])]
-
-
-
-
-
-
+'''
+print("filtered_data    ,", filtered_data)
+print()
+print("constraint_titles    ,", constraint_titles)
+print()
+print("dependants    ,", dependents)
+'''
 
 # This function checks the rules to make the graph
 def plotCheck(scale, variable):
@@ -281,52 +284,51 @@ def plotCheck(scale, variable):
 titleSize = 20
 labelSize = 20
 pointSize = 1
-def startPlot(cutList, x, y, z, i, j, k):
-    for cut in cutList:
-        fig, ax = plt.subplots(figsize=(8, 6))
-        sc = makePlot(ax, cut, x, y, z, k)
-        makeAxis(x, i, y, j, z, sc)
-        # Add labels and title
-        plt.xlabel(variableAxis.get(x), fontsize=labelSize)
-        plt.ylabel(variableAxis.get(y), fontsize=labelSize)
-        plt.title(constraint_titles.get(id(cut)), fontsize=titleSize)
-        plt.tight_layout()
+def startPlot(cut, x, y, z, i, j, k):
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sc = makePlot(ax, cut, x, y, z, k)
+    makeAxis(x, i, y, j, z, sc)
+    # Add labels and title
+    plt.xlabel(variableAxis.get(x), fontsize=labelSize)
+    plt.ylabel(variableAxis.get(y), fontsize=labelSize)
+    plt.title(constraint_titles.get(id(cut)), fontsize=titleSize)
+    plt.tight_layout()
 
-        outputFormat = ''
-        for l in [i, j, k]:
-            if l == 'linear':
-                outputFormat+='Lin'
-            else:
-                outputFormat+='Log'
-        
-        # Save  the plot to pdf format
-        print("Making: "+variableNames.get(id(cut))+"_"+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf')
-        if str(x) == 'S' or str(x) == 'T':
-            plt.xlim(-0.2, 0.3)
-        if str(y) == 'S' or str(y) == 'T':
-            plt.ylim(-0.1, 0.3)
-        plt.savefig(variableNames.get(id(cut))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
-        plt.close()
-        print("cut sample: \n", cut.sample(n=1))
-        if len(dependents.get(id(cut))) > 0:
-            print(dependents.get(cut))
-            for b in dependents.get(id(cut)):
-                print("Making: "+variableNames.get(id(cut))+"_"+variableNames.get(id(b))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf')
-                fig, ax = plt.subplots(figsize=(8, 6))
-                sc1 = makePlot(ax, b, x, y, z, k , 0)
-                sc2 = makePlot(ax, cut, x, y, z, k)
-                makeAxis(x, i, y, j, z, sc2)
+    outputFormat = ''
+    for l in [i, j, k]:
+        if l == 'linear':
+            outputFormat+='Lin'
+        else:
+            outputFormat+='Log'
+    
+    # Save  the plot to pdf format
+    print("Making: "+variableNames.get(id(cut))+"_"+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf')
+    if str(x) == 'S' or str(x) == 'T':
+        plt.xlim(-0.2, 0.3)
+    if str(y) == 'S' or str(y) == 'T':
+        plt.ylim(-0.1, 0.3)
+    plt.savefig(variableNames.get(id(cut))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
+    plt.close()
+    print("cut sample: \n", cut.sample(n=1))
+    print(dependents.get(cut))
+    if len(dependents.get(id(cut))) > 0:
+        for b in dependents.get(id(cut)):
+            print("Making: "+variableNames.get(id(cut))+"_"+variableNames.get(id(b))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf')
+            fig, ax = plt.subplots(figsize=(8, 6))
+            sc1 = makePlot(ax, b, x, y, z, k , 0)
+            sc2 = makePlot(ax, cut, x, y, z, k)
+            makeAxis(x, i, y, j, z, sc2)
 
-                plt.xlabel(variableAxis.get(x), fontsize=labelSize)
-                plt.ylabel(variableAxis.get(y), fontsize=labelSize)
-                plt.legend(loc='upper left')
-                plt.title(constraint_titles.get(id(cut)), fontsize=titleSize)
-                plt.tight_layout()
+            plt.xlabel(variableAxis.get(x), fontsize=labelSize)
+            plt.ylabel(variableAxis.get(y), fontsize=labelSize)
+            plt.legend(loc='upper left')
+            plt.title(constraint_titles.get(id(cut)), fontsize=titleSize)
+            plt.tight_layout()
 
-                # Save the plot to pdf format
-                
-                plt.savefig(variableNames.get(id(cut))+"_"+variableNames.get(id(b))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
-                plt.close()
+            # Save the plot to pdf format
+            
+            plt.savefig(variableNames.get(id(cut))+"_"+variableNames.get(id(b))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
+            plt.close()
         
 colors = [(0, 0, 1),  # Blue
           (0, 0, 0),  # Black
@@ -447,55 +449,36 @@ scales = {
     "Linear": ['linear'],
     "Both": ['log', 'linear']
 }
-constraint_numbers = {
-    "1": [
-        "dd - Direct Detection of Dark Matter >5% P-value",
-        "om - Planck Ωh²",
-        "cmb - CMB",
-        "lz - LUX-ZEPLIN 2024",
-        "ew - Electroweak Precision"
-    ],
-    "2": [  
-        "ddom - Direct Detection + Planck Ωh²",
-        "ddcmb - Direct Detection + CMB",
-        "ddlz - Direct Detection + LZ",
-        "omcmb - Planck Ωh² + CMB",
-        "omlz - Planck Ωh² + LZ",
-        "cmblz - CMB + LZ",
-    ],
-    "3": [
-        "ddomcmb - Direct Detection + Planck Ωh² + CMB",
-        "ddomlz - Direct Detection + Planck Ωh² + LZ",
-        "ddcmblz - Direct Detection + CMB + LZ",
-        "omcmblz - Planck Ωh² + CMB + LZ"
-    ],
-    "4": [
-        "tot - All constraints applied",
-        "totpla - All constrains + Planck"
-    ]
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+constraint_boxes = []
+for i in cut_titles:
+    constraint_boxes.append(i + ' - ' + cut_titles[i])
+
+
 constraint_selected = {
     "dd - Direct Detection of Dark Matter >5% P-value": filtered_data["dd"],
     "om - Planck Ωh²": filtered_data["om"],
     "cmb - CMB": filtered_data["cmb"],
     "lz - LUX-ZEPLIN 2024": filtered_data["lz"],
     "ew - Electroweak Precision": filtered_data["ew"],  
-    "ddom - Direct Detection + Planck Ωh²": filtered_data["ddom"],
-    "ddcmb - Direct Detection + CMB": filtered_data["ddcmb"],
-    "ddlz - Direct Detection + LZ": filtered_data["ddlz"],
-    "omcmb - Planck Ωh² + CMB": filtered_data["omcmb"],
-    "omlz - Planck Ωh² + LZ": filtered_data["omlz"],
-    "cmblz - CMB + LZ": filtered_data["cmblz"],
-    "ddomcmb - Direct Detection + Planck Ωh² + CMB": filtered_data["ddomcmb"],
-    "ddomlz - Direct Detection + Planck Ωh² + LZ": filtered_data["ddomlz"],
-    "ddcmblz - Direct Detection + CMB + LZ": filtered_data["ddcmblz"],
-    "omcmblz - Planck Ωh² + CMB + LZ": filtered_data["omcmblz"],
-    "tot - All constraints applied" : filtered_data["tot"],
-    "totpla - All constrains + Planck" : filtered_data["totpla"]
 }
-
-# Selected Constraints
-constraintList = []
 
 # Create the first frame (Axis selection screen)
 axis_scale_frame = tk.Frame(root, bg="#2E2E2E")
@@ -548,25 +531,32 @@ constraint_frame = tk.Frame(root, bg="#2E2E2E")
 tk.Label(constraint_frame, text="Constraint Selection", font=("Arial", 16, "bold"), **label_style).grid(row=0, column=0, columnspan=2, pady=10, sticky="nsew")
 
 # Create checkboxes for each constraint group
+# Dictionary to store the checkbox variables
 checkbox_vars = {}
+
+# Create checkboxes dynamically
 constraint_row = 1
-for group, constraints_list in constraint_numbers.items():
-    tk.Label(constraint_frame, text=f"{group} Constraints", **label_style).grid(row=constraint_row, column=0, columnspan=2, pady=10, sticky="nsew")
-    constraint_row += 1  # Increment row for next label
-    for constraint in constraints_list:
-        checkbox_vars[constraint] = tk.BooleanVar()  # Create a new BooleanVar for each constraint
-        checkbox = tk.Checkbutton(
-            constraint_frame,
-            text=constraint,
-            variable=checkbox_vars[constraint],
-            **label_style,  # Use the label_style for text colors
-            activebackground="#444444",  # Active background color when clicked
-            highlightbackground="#444444",  # Border highlight when clicked
-            highlightcolor="#888888",  # Highlight color for active state
-            selectcolor="#4C9F70"  # Color of the checkbox when selected (greenish)
-        )
-        checkbox.grid(row=constraint_row, column=0, sticky="w", padx=10)
-        constraint_row += 1  # Increment row for next checkbox
+tk.Label(constraint_frame, text="Select Constraints", **label_style).grid(
+    row=constraint_row, column=0, columnspan=2, pady=10, sticky="nsew"
+)
+constraint_row += 1  # Increment row for next label
+for cut in constraint_boxes:
+    checkbox_vars[cut] = tk.BooleanVar()  # Create a BooleanVar for each constraint
+    checkbox = tk.Checkbutton(
+        constraint_frame,
+        text=cut,  # Display user-friendly constraint name
+        variable=checkbox_vars[cut],
+        **label_style,  # Use the label_style for text colors
+        activebackground="#444444",
+        highlightbackground="#444444",
+        highlightcolor="#888888",
+        selectcolor="#4C9F70",
+    )
+    checkbox.grid(row=constraint_row, column=0, sticky="w", padx=10)
+    constraint_row += 1  # Increment row for the next checkbox
+
+
+
 
 #Function to update the displayed selections
 def update_selected_options(*args):
@@ -597,25 +587,33 @@ def generate_selections():
     generating_label = tk.Label(constraint_frame, text="Making Plots... (check console)")
     generating_label.grid(row=constraint_row+2, column=0, columnspan=2, pady=10)
     constraint_frame.update()
-    global constraintList
+
+    selected_constraints = [cut.split(" - ")[0] for cut, var in checkbox_vars.items() if var.get()]
+    print("selected_constraints", selected_constraints)
+    appliedConstraint = ''
     # Collect selected constraints
-    constraintList = [constraint_selected.get(constraint) for constraint, var in checkbox_vars.items() if var.get()]
-    if not constraintList:
-        constraintList = [nf]
-    print(constraintList)
-    generatePlot()
+    if len(selected_constraints) == len(cut_titles):
+        appliedConstraint = 'tot'
+    elif len(selected_constraints) == 0:
+        appliedConstraint = 'nf'
+    else:
+        for i in selected_constraints:
+            appliedConstraint += i
+
+    print(appliedConstraint)
+    generatePlot(appliedConstraint)
     generating_label.destroy()
     constraint_frame.update()
     print("RANDOM POINT THAT WORKS")
 
-def generatePlot():
+def generatePlot(appliedConstraint):
     for i in scales.get(x_scale.get()):
         if plotCheck(i, variables.get(x_axis.get())) == 1:
             for j in scales.get(y_scale.get()):
                 if plotCheck(j, variables.get(y_axis.get())) == 1:
                     for k in scales.get(z_scale.get()):
                         if plotCheck(k, variables.get(z_axis.get())) == 1:
-                            startPlot(constraintList, variables.get(x_axis.get()), variables.get(y_axis.get()), variables.get(z_axis.get()), i, j, k)
+                            startPlot(appliedConstraint, variables.get(x_axis.get()), variables.get(y_axis.get()), variables.get(z_axis.get()), i, j, k)
 
 # Generate button
 generate_button = tk.Button(constraint_frame, text="Generate", command=generate_selections, width=30, **button_style)

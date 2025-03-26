@@ -141,7 +141,7 @@ for r in range(1, len(individualCuts) + 1):
 # Special cases for tot, totpla, and totbao
 cutList["tot"] = cutList["ddomcmblzew"]
 filtered_data["tot"] = nf[cutList["tot"]]
-del cutList["ddomcmblzew"]
+del cutList["ddomcmblzew"] #this delete
 cutList["totpla"] = cutList["tot"] & cutPLA
 filtered_data["totpla"] = nf[cutList["totpla"]]
 cutList["totbao"] = cutList["tot"] & cutBAO
@@ -260,7 +260,8 @@ print()
 print("constraint_titles    ,", constraint_titles)
 print()
 print("dependants    ,", dependents)
-'''
+''' 
+
 
 # This function checks the rules to make the graph
 def plotCheck(scale, variable):
@@ -451,22 +452,6 @@ scales = {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 constraint_boxes = []
 for i in cut_titles:
     constraint_boxes.append(i + ' - ' + cut_titles[i])
@@ -593,14 +578,13 @@ def generate_selections():
     appliedConstraint = ''
     # Collect selected constraints
     if len(selected_constraints) == len(cut_titles):
-        appliedConstraint = 'tot'
+        appliedConstraint = filtered_data[tot]
     elif len(selected_constraints) == 0:
-        appliedConstraint = 'nf'
+        appliedConstraint = nf
     else:
         for i in selected_constraints:
             appliedConstraint += i
-
-    print(appliedConstraint)
+        appliedConstraint = filtered_data[appliedConstraint]
     generatePlot(appliedConstraint)
     generating_label.destroy()
     constraint_frame.update()

@@ -11,6 +11,7 @@ from scipy.stats import chi2
 from scipy.spatial.distance import mahalanobis
 from itertools import combinations
 from collections import defaultdict
+import math
 
 # Specify the path to your file
 file_path = 'scan.dat.gz' 
@@ -48,7 +49,7 @@ def fb(x):
     y = 3 - (4*np.log(x))
     return y
 def fc(x, y): #thanks Linus!
-    mask = np.isclose(x, y, rtol=1e-3)
+    mask = np.isclose(x, y, rtol=1e-10)
     result = np.zeros_like(x)
     result[~mask] = ((x[~mask] + y[~mask]) / 2) - ((x[~mask] * y[~mask]) / (x[~mask] - y[~mask])) * np.log(x[~mask] / y[~mask])
     return result
@@ -58,18 +59,40 @@ def f_c(x,y):
     
 alpha = 1/137 #fine structure constant,  = e**2/(4 * pi * epsilon_0 * h_bar * c)
 nu = 246 #Vacuum expectation value
-nf["S"] = ((1/(72*np.pi)) * (1/((((nf["Mh2"]/nf["Mh+"])**2) - ((nf["MD1"]/nf["Mh+"])**2))**3))
-            * ((((nf["Mh2"]/nf["Mh+"])**6) * fa((nf["Mh2"]/nf["Mh+"]))) - (((nf["MD1"]/nf["Mh+"])**6)
-            * fa((nf["MD1"]/nf["Mh+"]))) + (9 * ((nf["Mh2"]/nf["Mh+"])**2) * ((nf["MD1"]/nf["Mh+"])**2 )
-            * ((((nf["Mh2"]/nf["Mh+"])**2) * fb((nf["Mh2"]/nf["Mh+"]))) - (((nf["MD1"]/nf["Mh+"])**2)
-                                                                        * fb((nf["MD1"]/nf["Mh+"])))))))
-nf["T"] = ((1/(32*(np.pi**2)*alpha*(nu**2)))
-            * (fc((nf["Mh+"]**2),(nf["Mh2"]**2)) + fc((nf["Mh+"]**2),(nf["MD1"]**2)) - fc((nf["Mh2"]**2),(nf["MD1"]**2))))
+# Create a mask for values that are NOT too close
+x1 = nf["MD1"]/nf["Mh+"]
+x2 = nf["Mh2"]/nf["Mh+"]
 
+# Filter the DataFrame
+nf["S"] = (
+    (1/(72*np.pi)) * (1/(((x2**2)-(x1**2))**3))
+    *(
+        ((x2**6) * fa(x2))
+        - ((x1**6) * fa((x1)))
+        + (9 * (x2**2) * (x1**2)
+            *(
+                ((x2**2) * fb((x2))) 
+                - ((x1**2) * fb((x1)))
+            ))
+    )
+)
+nf["T"] = (
+    (1 / (32 * (np.pi**2) * alpha * (nu**2)))
+    *(
+        fc((nf["Mh+"]**2),(nf["Mh2"]**2)) 
+        + fc((nf["Mh+"]**2),(nf["MD1"]**2)) 
+        - fc((nf["Mh2"]**2),(nf["MD1"]**2))
+    )
+)
 
-S_central, S_error = 0.06, 0.09
-T_central, T_error = 0.1, 0.07
-Corr_ST = 0.91  #correlation between S and T
+#fix this, loptial rule. youre getting 0/0
+
+nf.loc[np.isclose(x1**2, x2**2, rtol=1e-4), 'S'] = np.nan #these points are too close to work, so we set the S to N/A, since it goes to infinty
+
+S_central, S_error = -0.01, 0.07
+T_central, T_error = 0.04, 0.06
+
+Corr_ST = 0.92  #correlation between S and T
 cov_matrix = np.array([[S_error**2, Corr_ST * S_error * T_error], [Corr_ST * S_error * T_error, T_error**2]])
 def confidence_ellipse(mean, cov, ax, n_std=1, **kwargs):
     eigvals, eigvecs = np.linalg.eigh(cov)
@@ -254,13 +277,6 @@ for cut_name, data in filtered_data.items():
 dependents[id(["tot"])] = [id(cut) for cut in filtered_data.values()]
 dependents[id(filtered_data["totpla"])] = [id(filtered_data["tot"])]
 dependents[id(filtered_data["totbao"])] = [id(filtered_data["tot"])]
-'''
-print("filtered_data    ,", filtered_data)
-print()
-print("constraint_titles    ,", constraint_titles)
-print()
-print("dependants    ,", dependents)
-''' 
 
 
 # This function checks the rules to make the graph
@@ -309,6 +325,7 @@ def startPlot(cut, x, y, z, i, j, k):
     if str(y) == 'S' or str(y) == 'T':
         plt.ylim(-0.1, 0.3)
     plt.savefig(variableNames.get(id(cut))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
+    plt.show()
     plt.close()
     print("cut sample: \n", cut.sample(n=1))
     print(dependents.get(cut))
@@ -327,8 +344,10 @@ def startPlot(cut, x, y, z, i, j, k):
             plt.tight_layout()
 
             # Save the plot to pdf format
-            
+
+            #zs to stack
             plt.savefig(variableNames.get(id(cut))+"_"+variableNames.get(id(b))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
+            plt.show()
             plt.close()
         
 colors = [(0, 0, 1),  # Blue
@@ -373,6 +392,7 @@ def makePlot(ax, dataset, x, y, z, k , colour = 1):
                 confidence_ellipse([S_central, T_central], cov_matrix, ax, n_std=ns, edgecolor=color, fill=False) 
     else:
         sc = ax.scatter(dataset[x], dataset[y], c='gray', s=pointSize, rasterized=True, label=constraint_titles.get(id(dataset)))
+        #different colours for different constraints?
     return sc
 
 def makeAxis(x, i, y, j, z, sc):
@@ -578,7 +598,7 @@ def generate_selections():
     appliedConstraint = ''
     # Collect selected constraints
     if len(selected_constraints) == len(cut_titles):
-        appliedConstraint = filtered_data[tot]
+        appliedConstraint = filtered_data["tot"]
     elif len(selected_constraints) == 0:
         appliedConstraint = nf
     else:

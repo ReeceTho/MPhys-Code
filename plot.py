@@ -59,7 +59,7 @@ def f_c(x,y):
     
 alpha = 1/137 #fine structure constant,  = e**2/(4 * pi * epsilon_0 * h_bar * c)
 nu = 246 #Vacuum expectation value
-# Create a mask for values that are NOT too close
+
 x1 = nf["MD1"]/nf["Mh+"]
 x2 = nf["Mh2"]/nf["Mh+"]
 
@@ -85,24 +85,42 @@ nf["T"] = (
     )
 )
 
-#fix this, loptial rule. youre getting 0/0
-
 nf.loc[np.isclose(x1**2, x2**2, rtol=1e-4), 'S'] = np.nan #these points are too close to work, so we set the S to N/A, since it goes to infinty
+#S will not plot NaN values
 
-S_central, S_error = -0.01, 0.07
-T_central, T_error = 0.04, 0.06
 
-Corr_ST = 0.92  #correlation between S and T
-cov_matrix = np.array([[S_error**2, Corr_ST * S_error * T_error], [Corr_ST * S_error * T_error, T_error**2]])
-def confidence_ellipse(mean, cov, ax, n_std=1, **kwargs):
+#https://arxiv.org/pdf/1407.3792
+S_central_2014, S_error_2014 = 0.06, 0.09
+T_central_2014, T_error_2014 = 0.1, 0.07
+Corr_ST_2014 = 0.91  #correlation between S and T
+#https://arxiv.org/pdf/1803.01853
+S_central_2018, S_error_2018 = 0.04, 0.08
+T_central_2018, T_error_2018 = 0.08, 0.07
+Corr_ST_2018 = 0.92  #correlation between S and T
+#https://pdg.lbl.gov/2023/reviews/rpp2023-rev-standard-model.pdf
+S_central_2023, S_error_2023 = -0.01, 0.07
+T_central_2023, T_error_2023 = 0.04, 0.06
+Corr_ST_2023 = 0.92  #correlation between S and T
+
+STpapers = [[S_central_2023, S_error_2023, T_central_2023, T_error_2023, Corr_ST_2023],
+            [S_central_2018, S_error_2018, T_central_2018, T_error_2018, Corr_ST_2018],
+            [S_central_2014, S_error_2014, T_central_2014, T_error_2014, Corr_ST_2014],     
+]
+
+def cov_matrix(S_error, T_error, Corr_ST):
+    return np.array([[S_error**2, Corr_ST * S_error * T_error], [Corr_ST * S_error * T_error, T_error**2]])
+
+def confidence_ellipse(mean, cov, ax, n_std=2, **kwargs):
     eigvals, eigvecs = np.linalg.eigh(cov)
     angle = np.degrees(np.arctan2(*eigvecs[:, 0][::-1]))
     scale_factor = np.sqrt(chi2.ppf({1: 0.68, 2: 0.964}[n_std], df=2))
     width, height = 2 * np.sqrt(eigvals) * scale_factor
     ellipse = Ellipse(xy=mean, width=width, height=height, angle=angle, **kwargs)
     ax.add_patch(ellipse)
+
 # Inverse of covariance matrix for Mahalanobis distance calculation
-cov_inv = np.linalg.inv(cov_matrix)
+def cov_inv(cov_matrix):
+    return np.linalg.inv(cov_matrix)
 
 variableAxis = {
     'MD1' : r"$M_{h_1}$ / (GeV)",
@@ -136,7 +154,7 @@ cutBAO=(nf['Omegah2'] <= 0.12206) & (nf['Omegah2'] >= 0.1166) # based on BAO dat
 #MAKE ONE WITH 10%
 cutCMB=(nf['CMB_ID'] < 1)  
 cutLZ=(nf['protonSI'] < np.interp(nf['MD1'], x_values, y_data["limit"])) #this is to get all the points beneath the line
-cutEW = (np.array([mahalanobis([s, t], [S_central, T_central], cov_inv) for s, t in zip(nf['S'], nf['T'])]) <= np.sqrt(chi2.ppf(0.964, df=2)))
+cutEW = (np.array([mahalanobis([s, t], [S_central_2023, T_central_2023], cov_inv(cov_matrix(S_error_2023, T_error_2023, Corr_ST_2023))) for s, t in zip(nf['S'], nf['T'])]) <= np.sqrt(chi2.ppf(0.964, df=2)))
 #function LZ_2024, call it, compare number of exclusion.
 
 # Define individual cuts (excluding PLA and BAO as special cases)
@@ -384,12 +402,11 @@ def makePlot(ax, dataset, x, y, z, k , colour = 1):
             for key, values in y_data.items():
                 ax.plot(x_values, y_data["limit"], label=key)
         if x == 'S' and y == 'T':
-            for ns in [1, 2]:  # plot 1st and 2nd standard deviation ellipses
-                if ns == 1:
-                    color = 'red'
-                else:
-                    color = 'blue'
-                confidence_ellipse([S_central, T_central], cov_matrix, ax, n_std=ns, edgecolor=color, fill=False) 
+            colours = ['red', 'blue', 'green']
+            for paper in range(0, len(STpapers)):  # plot 1st and 2nd standard deviation ellipses
+                confidence_ellipse([STpapers[paper][0], STpapers[paper][2]], 
+                                   cov_matrix(STpapers[paper][1], STpapers[paper][3], STpapers[paper][4]), 
+                                   edgecolor = colours[paper], ax=ax, fill=True, alpha = .2, facecolor = colours[paper])
     else:
         sc = ax.scatter(dataset[x], dataset[y], c='gray', s=pointSize, rasterized=True, label=constraint_titles.get(id(dataset)))
         #different colours for different constraints?

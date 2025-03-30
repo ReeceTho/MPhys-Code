@@ -189,7 +189,7 @@ cutList["totbao"] = cutList["tot"] & cutBAO
 filtered_data["totbao"] = nf[cutList["totbao"]]
 #filtered_data takes the format "cutname":*df of that cut*
 
-
+#this part is for creating the titles inside the graphs.
 cut_titles = {
     "dd": "Direct Detection of Dark Matter >5% P-value",
     "om": "Planck Ωh² Constraint",
@@ -206,8 +206,6 @@ constraint_titles[id(filtered_data["tot"])] = "All Constraints (with External So
 constraint_titles[id(filtered_data["totpla"])] = "All Constraints (with Planck) Applied"
 constraint_titles[id(filtered_data["totbao"])] = "All Constraints (with BAO) Applied"
 
-
-# Generate titles for each cut combination
 for cut_name, data in filtered_data.items():
     # Skip special cases already handled
     if cut_name in ["tot", "totpla", "totbao"]:
@@ -232,20 +230,9 @@ for cut_name, data in filtered_data.items():
             constraint_titles[id(data)] = cut_titles[cut_name]
 
 
-# Initialize variableNames with the unfiltered data
-variableNames = {id(nf): "nf"}
-
-# Generate variable names dynamically based on filtered_data
-for cut_name, data in filtered_data.items():
-    variableNames[id(data)] = cut_name.lower()  # Keep the naming convention consistent
-
-# Special cases
-variableNames[id(filtered_data["tot"])] = "tot"
-variableNames[id(filtered_data["totpla"])] = "totpla"
-variableNames[id(filtered_data["totbao"])] = "totbao"
 
 # Initialize dependents dictionary with empty dependencies for unfiltered data
-dependents = {id(nf): []}
+dependents = {"nf": []}
 
 # Define the basic cut names (for dependency checking)
 basic_cuts = {
@@ -256,45 +243,28 @@ basic_cuts = {
     "ew": filtered_data["ew"]
 }
 
-# Add dependencies for individual cuts (dd, om, cmb, etc.)
-for cut_name, data in filtered_data.items():
-    if cut_name in basic_cuts:  # For basic cuts like dd, om, cmb, etc.
-        dependents[id(data)] = [id(nf)]
-    else:  # For combined cuts, check which individual cuts form the combination
-        cut_dependencies = []
-        
-        # Check which basic cuts are included in the combination (check for substrings)
-        for key in basic_cuts:
-            if key in cut_name:  # If the cut_name contains the basic cut (substring check)
-                cut_dependencies.append(id(basic_cuts[key]))
-
-        # If the combination has dependencies on other cuts (basic or combined)
-        if len(cut_dependencies) > 0:
-            dependents[id(data)] = cut_dependencies
-
-# Handle the dependencies for combined cuts (like omcmblz, ddomcmb, etc.)
-for cut_name, data in filtered_data.items():
-    # If the cut is a combined cut (no spaces, continuous string of basic cuts)
-    if cut_name not in basic_cuts:  # If the cut is not a basic one, it's combined
-        cut_dependencies = []
-        
-        # Check for dependencies on basic cuts (look for substrings)
-        for key in basic_cuts:
-            if key in cut_name:  # If the basic cut is part of the combined cut
-                cut_dependencies.append(id(basic_cuts[key]))
-
-        # Add dependencies for other combined cuts involved in the current combined cut
-        for combined_cut in filtered_data:
-            if combined_cut != cut_name and combined_cut in cut_name:
-                cut_dependencies.append(id(filtered_data[combined_cut]))
-
-        # Store dependencies for the combined cut
-        dependents[id(data)] = cut_dependencies
+for cut_name in filtered_data.keys():
+    if cut_name in basic_cuts:
+        continue  # Skip basic cuts since they are already handled
+    
+    cut_dependencies = ["nf"]  # Every cut depends on nf
+    
+    # Check for dependencies on basic cuts
+    for key in basic_cuts:
+        if key in cut_name:
+            cut_dependencies.append(key)
+    
+    # Add dependencies for other combined cuts involved in the current cut
+    for combined_cut in filtered_data:
+        if combined_cut != cut_name and combined_cut in cut_name:
+            cut_dependencies.append(combined_cut)
+    
+    dependents[cut_name] = sorted(set(cut_dependencies))  # Remove duplicates and sort
 
 # Special cases for tot, totpla, and totbao (tot depends on everything)
-dependents[id(["tot"])] = [id(cut) for cut in filtered_data.values()]
-dependents[id(filtered_data["totpla"])] = [id(filtered_data["tot"])]
-dependents[id(filtered_data["totbao"])] = [id(filtered_data["tot"])]
+dependents["tot"] = [id(cut) for cut in filtered_data.values()]
+dependents["totpla"] = ["tot"]
+dependents["totbao"] = ["tot"]
 
 
 # This function checks the rules to make the graph
@@ -320,8 +290,13 @@ titleSize = 20
 labelSize = 20
 pointSize = 1
 def startPlot(cut, x, y, z, i, j, k):
+    print("cut:", cut)
+    if cut != 'nf':
+        cut_plot = filtered_data[cut]
+    else:
+        cut_plot = nf
     fig, ax = plt.subplots(figsize=(8, 6))
-    sc = makePlot(ax, cut, x, y, z, k)
+    sc = makePlot(ax, cut_plot, x, y, z, k)
     makeAxis(x, i, y, j, z, sc)
     # Add labels and title
     plt.xlabel(variableAxis.get(x), fontsize=labelSize)
@@ -337,19 +312,19 @@ def startPlot(cut, x, y, z, i, j, k):
             outputFormat+='Log'
     
     # Save  the plot to pdf format
-    print("Making: "+variableNames.get(id(cut))+"_"+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf')
+    print("Making: "+cut+"_"+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf')
     if str(x) == 'S' or str(x) == 'T':
         plt.xlim(-0.2, 0.3)
     if str(y) == 'S' or str(y) == 'T':
         plt.ylim(-0.1, 0.3)
-    plt.savefig(variableNames.get(id(cut))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
+    plt.savefig(cut+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
     plt.show()
     plt.close()
     print("cut sample: \n", cut.sample(n=1))
     print(dependents.get(cut))
     if len(dependents.get(id(cut))) > 0:
         for b in dependents.get(id(cut)):
-            print("Making: "+variableNames.get(id(cut))+"_"+variableNames.get(id(b))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf')
+            print("Making: "+cut+"_"+variableNames.get(id(b))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf')
             fig, ax = plt.subplots(figsize=(8, 6))
             sc1 = makePlot(ax, b, x, y, z, k , 0)
             sc2 = makePlot(ax, cut, x, y, z, k)
@@ -364,7 +339,7 @@ def startPlot(cut, x, y, z, i, j, k):
             # Save the plot to pdf format
 
             #zs to stack
-            plt.savefig(variableNames.get(id(cut))+"_"+variableNames.get(id(b))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
+            plt.savefig(cut+"_"+variableNames.get(id(b))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
             plt.show()
             plt.close()
         
@@ -551,7 +526,7 @@ def go_to_constraint_screen():
 next_button = tk.Button(axis_scale_frame, text="Next", command=go_to_constraint_screen, width=30, **button_style)
 next_button.grid(row=8, column=0, columnspan=2, pady=20)
 
-# Create the third frame (Constraint selection screen)
+# Create the constraint selection screen
 constraint_frame = tk.Frame(root, bg="#2E2E2E")
 
 #Things on the constraint screen
@@ -581,8 +556,6 @@ for cut in constraint_boxes:
     )
     checkbox.grid(row=constraint_row, column=0, sticky="w", padx=10)
     constraint_row += 1  # Increment row for the next checkbox
-
-
 
 
 #Function to update the displayed selections
@@ -620,13 +593,12 @@ def generate_selections():
     appliedConstraint = ''
     # Collect selected constraints
     if len(selected_constraints) == len(cut_titles):
-        appliedConstraint = filtered_data["tot"]
+        appliedConstraint = "tot"
     elif len(selected_constraints) == 0:
-        appliedConstraint = nf
+        appliedConstraint = "nf"
     else:
         for i in selected_constraints:
             appliedConstraint += i
-        appliedConstraint = filtered_data[appliedConstraint]
     generatePlot(appliedConstraint)
     generating_label.destroy()
     constraint_frame.update()

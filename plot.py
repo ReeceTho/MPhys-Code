@@ -380,7 +380,7 @@ custom_cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=256)
 def makePlot(ax, dataset, x, y, z, k , colour = 1):
     if colour == 1:
         if k == 'log':  #log colour map
-            if z == 'l345': #lambda has negative numbers, so we make a new graph specifically for it
+            if z in {'l345', 'DM3'} : #lambda has negative numbers, so we make a new graph specifically for it
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
                                 cmap='seismic', norm=SymLogNorm(linthresh = 1e-5, vmin=dataset[z].min(),
                                 vmax=dataset[z].max()),s=pointSize, label=constraint_titles.get(id(dataset)))
@@ -392,7 +392,7 @@ def makePlot(ax, dataset, x, y, z, k , colour = 1):
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, cmap='jet', norm=LogNorm(
                     vmin=dataset[z].min(), vmax=dataset[z].max()),s=pointSize, label=constraint_titles.get(id(dataset)))
         else:   #linear colour map
-            if z == 'l345':
+            if z in {'l345', 'DM3'}:
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, 
                         cmap='seismic', s=pointSize, label=constraint_titles.get(id(dataset)))
             else:
@@ -413,15 +413,20 @@ def makePlot(ax, dataset, x, y, z, k , colour = 1):
     return sc
 
 def makeAxis(x, i, y, j, z, sc):
-    if x == 'l345' and i == 'log':
+    print("X = ",x)
+    print("Y = ",y)
+    print(type(x))
+    if x in {'l345', 'DM3'} and i == 'log':
         plt.xscale('symlog', linthresh = 1e-5)
+        print("This condition is met!!!! (X)")
     elif x == 'brH_DMDM' and i == 'log':
         plt.xscale('symlog', linthresh = 1e-20)
     else:
         plt.xscale(i)
 
-    if y == 'l345' and j == 'log':
+    if y in {'l345', 'DM3'} and j == 'log':
         plt.yscale('symlog', linthresh = 1e-5)
+        print("This condition is met!!!! (Y)")
     elif y == 'brH_DMDM' and j == 'log':
         plt.yscale('symlog', linthresh = 1e-20)
     else:
@@ -652,3 +657,4 @@ go_back_button.grid(row=constraint_row + 1, column=0, pady=10, sticky="nsew")
 axis_scale_frame.pack(fill="both", expand=True)
 
 root.mainloop()
+#maybe negative m+ compared to m1?

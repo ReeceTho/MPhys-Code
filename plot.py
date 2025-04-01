@@ -172,21 +172,28 @@ filtered_data = {}
 
 # Generate all possible cut combinations
 for r in range(1, len(individualCuts) + 1):  
+    print(r)
     for combo in combinations(individualCuts.keys(), r):
         cut_name = "".join(combo)
         cutList[cut_name] = individualCuts[combo[0]]
+        print("cut name: ", cut_name)
+        print("combo ", combo)
         for key in combo[1:]:
+            print("key ", key)
             cutList[cut_name] &= individualCuts[key]
         filtered_data[cut_name] = nf[cutList[cut_name]]
+        
 
 # Special cases for tot, totpla, and totbao
 cutList["tot"] = cutList["ddomcmblzew"]
 filtered_data["tot"] = nf[cutList["tot"]]
-del cutList["ddomcmblzew"] #this delete
+del filtered_data["ddomcmblzew"] #this delete
 cutList["totpla"] = cutList["tot"] & cutPLA
 filtered_data["totpla"] = nf[cutList["totpla"]]
 cutList["totbao"] = cutList["tot"] & cutBAO
 filtered_data["totbao"] = nf[cutList["totbao"]]
+
+print(filtered_data.keys())
 #filtered_data takes the format "cutname":*df of that cut*
 
 #this part is for creating the titles inside the graphs.
@@ -235,36 +242,32 @@ for cut_name, data in filtered_data.items():
 dependents = {"nf": []}
 
 # Define the basic cut names (for dependency checking)
-basic_cuts = {
-    "dd": filtered_data["dd"],
-    "om": filtered_data["om"],
-    "cmb": filtered_data["cmb"],
-    "lz": filtered_data["lz"],
-    "ew": filtered_data["ew"]
-}
 
 for cut_name in filtered_data.keys():
-    if cut_name in basic_cuts:
-        continue  # Skip basic cuts since they are already handled
-    
+    print("cut_name: ", cut_name)
     cut_dependencies = ["nf"]  # Every cut depends on nf
-    
-    # Check for dependencies on basic cuts
-    for key in basic_cuts:
-        if key in cut_name:
-            cut_dependencies.append(key)
-    
-    # Add dependencies for other combined cuts involved in the current cut
-    for combined_cut in filtered_data:
-        if combined_cut != cut_name and combined_cut in cut_name:
-            cut_dependencies.append(combined_cut)
-    
-    dependents[cut_name] = sorted(set(cut_dependencies))  # Remove duplicates and sort
+    single_dependents = []
 
+    for key in filtered_data.keys():
+        if key in cut_name and key != cut_name and key in individualCuts.keys():
+            if key != cut_name:
+                single_dependents.append(key)
+
+    for r in range(1, len(single_dependents)):  
+        for combo in combinations(single_dependents, r):
+            component_cut = "".join(combo)
+            cut_dependencies.append(component_cut)
+    
+    dependents[cut_name] = cut_dependencies
+            
 # Special cases for tot, totpla, and totbao (tot depends on everything)
-dependents["tot"] = [id(cut) for cut in filtered_data.values()]
+total_dependents = list(filtered_data.keys())
+del total_dependents[-3:] # removes the last 3 dictionary keys from filtered_data (tot, totpla, totbao)
+dependents["tot"] = total_dependents
 dependents["totpla"] = ["tot"]
 dependents["totbao"] = ["tot"]
+
+print(dependents)
 
 
 # This function checks the rules to make the graph
@@ -534,7 +537,7 @@ tk.Label(constraint_frame, text="Constraint Selection", font=("Arial", 16, "bold
 
 # Create checkboxes for each constraint group
 # Dictionary to store the checkbox variables
-checkbox_vars = {}
+checkbox_constraints = {}
 
 # Create checkboxes dynamically
 constraint_row = 1
@@ -543,11 +546,11 @@ tk.Label(constraint_frame, text="Select Constraints", **label_style).grid(
 )
 constraint_row += 1  # Increment row for next label
 for cut in constraint_boxes:
-    checkbox_vars[cut] = tk.BooleanVar()  # Create a BooleanVar for each constraint
+    checkbox_constraints[cut] = tk.BooleanVar()  # Create a BooleanVar for each constraint
     checkbox = tk.Checkbutton(
         constraint_frame,
         text=cut,  # Display user-friendly constraint name
-        variable=checkbox_vars[cut],
+        variable=checkbox_constraints[cut],
         **label_style,  # Use the label_style for text colors
         activebackground="#444444",
         highlightbackground="#444444",
@@ -588,7 +591,7 @@ def generate_selections():
     generating_label.grid(row=constraint_row+2, column=0, columnspan=2, pady=10)
     constraint_frame.update()
 
-    selected_constraints = [cut.split(" - ")[0] for cut, var in checkbox_vars.items() if var.get()]
+    selected_constraints = [cut.split(" - ")[0] for cut, var in checkbox_constraints.items() if var.get()]
     print("selected_constraints", selected_constraints)
     appliedConstraint = ''
     # Collect selected constraints
@@ -602,7 +605,6 @@ def generate_selections():
     generatePlot(appliedConstraint)
     generating_label.destroy()
     constraint_frame.update()
-    print("RANDOM POINT THAT WORKS")
 
 def generatePlot(appliedConstraint):
     for i in scales.get(x_scale.get()):
@@ -630,3 +632,65 @@ axis_scale_frame.pack(fill="both", expand=True)
 
 root.mainloop()
 #maybe negative m+ compared to m1?
+
+
+
+
+
+
+
+# Create the dependents selection screen
+dependents_frame = tk.Frame(root, bg="#2E2E2E")
+
+#Things on the dependents screen
+tk.Label(dependents_frame, text="Dependents Selection", font=("Arial", 16, "bold"), **label_style).grid(row=0, column=0, columnspan=2, pady=10, sticky="nsew")
+
+# Create checkboxes for each constraint group
+# Dictionary to store the checkbox variables
+checkbox_dependents = {}
+
+# Create checkboxes dynamically
+dependents_row = 1
+tk.Label(dependents_frame, text="Select Dependents", **label_style).grid(
+    row=dependents_row, column=0, columnspan=2, pady=10, sticky="nsew"
+)
+dependents_row += 1  # Increment row for next label
+for dependent in dependents[appliedConstraint]:
+    checkbox_dependent[dependent] = tk.BooleanVar()  # Create a BooleanVar for each constraint
+    checkbox = tk.Checkbutton(
+        dependents_frame,
+        text=dependent,  # Display user-friendly constraint name
+        variable=checkbox_constraints[dependent],
+        **label_style,  # Use the label_style for text colors
+        activebackground="#444444",
+        highlightbackground="#444444",
+        highlightcolor="#888888",
+        selectcolor="#4C9F70",
+    )
+    checkbox.grid(row=dependents_row, column=0, sticky="w", padx=10)
+    dependents_row += 1  # Increment row for the next checkbox
+
+
+#Function to update the displayed selections
+def update_selected_options(*args):
+    selected_options_text.set(
+        f"AXIS:\nX-axis: {x_axis.get()}\nY-axis: {y_axis.get()}\nZ-axis: {z_axis.get()}\n\n"
+        f"SCALE:\nX-scale: {x_scale.get()}\nY-scale: {y_scale.get()}\nZ-scale: {z_scale.get()}"
+    )
+
+# Add trace to update selected options when any of the variables change
+x_axis.trace("w", update_selected_options)
+y_axis.trace("w", update_selected_options)
+z_axis.trace("w", update_selected_options)
+x_scale.trace("w", update_selected_options)
+y_scale.trace("w", update_selected_options)
+z_scale.trace("w", update_selected_options)
+
+# Initialize the selected_options_text
+selected_options_text = tk.StringVar()
+update_selected_options()  # Initial update when the window first loads
+
+# Display selected options from Axis and Scale
+selected_options_text = tk.StringVar(value=f"AXIS:\nX-axis: {x_axis.get()}\nY-axis: {y_axis.get()}\nZ-axis: {z_axis.get()}\n\nSCALE:\nX-scale: {x_scale.get()}\nY-scale: {y_scale.get()}\nZ-scale: {z_scale.get()}")
+# Display constraints based on groupings
+tk.Label(dependents_frame, textvariable=selected_options_text, **label_style).grid(row=1, column=2, rowspan=8, padx=10, sticky="w")

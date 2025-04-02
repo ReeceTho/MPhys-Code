@@ -524,10 +524,10 @@ tk.OptionMenu(axis_scale_frame, z_scale, *list(scales.keys())).grid(row=7, colum
 def go_to_constraint_screen():
     axis_scale_frame.pack_forget()  # Hide scale selection frame
     constraint_frame.pack(fill="both", expand=True)    # Show constraint selection frame
-    update_selected_options()
+    update_selected_options_axis()
 
-next_button = tk.Button(axis_scale_frame, text="Next", command=go_to_constraint_screen, width=30, **button_style)
-next_button.grid(row=8, column=0, columnspan=2, pady=20)
+go_to_constraints_button = tk.Button(axis_scale_frame, text="Next", command=go_to_constraint_screen, width=30, **button_style)
+go_to_constraints_button.grid(row=8, column=0, columnspan=2, pady=20)
 
 # Create the constraint selection screen
 constraint_frame = tk.Frame(root, bg="#2E2E2E")
@@ -562,6 +562,87 @@ for cut in constraint_boxes:
 
 
 #Function to update the displayed selections
+def update_selected_options_axis(*args):
+    selected_options_text.set(
+        f"AXIS:\nX-axis: {x_axis.get()}\nY-axis: {y_axis.get()}\nZ-axis: {z_axis.get()}\n\n"
+        f"SCALE:\nX-scale: {x_scale.get()}\nY-scale: {y_scale.get()}\nZ-scale: {z_scale.get()}"
+    )
+
+# Add trace to update selected options when any of the variables change
+x_axis.trace("w", update_selected_options_axis)
+y_axis.trace("w", update_selected_options_axis)
+z_axis.trace("w", update_selected_options_axis)
+x_scale.trace("w", update_selected_options_axis)
+y_scale.trace("w", update_selected_options_axis)
+z_scale.trace("w", update_selected_options_axis)
+
+# Initialize the selected_options_text
+selected_options_text = tk.StringVar()
+update_selected_options_axis()  # Initial update when the window first loads
+
+# Display selected options from Axis and Scale
+selected_options_text = tk.StringVar(value=f"AXIS:\nX-axis: {x_axis.get()}\nY-axis: {y_axis.get()}\nZ-axis: {z_axis.get()}\n\nSCALE:\nX-scale: {x_scale.get()}\nY-scale: {y_scale.get()}\nZ-scale: {z_scale.get()}")
+# Display constraints based on groupings
+tk.Label(constraint_frame, textvariable=selected_options_text, **label_style).grid(row=1, column=2, rowspan=8, padx=10, sticky="w")
+
+# Create the dependents selection screen
+dependents_frame = tk.Frame(root, bg="#2E2E2E")
+
+def go_to_dependents_screen():
+    axis_scale_frame.pack_forget()  # Hide scale selection frame
+    dependents_frame.pack(fill="both", expand=True)    # Show constraint selection frame
+    update_selected_options_constraint()
+
+go_to_dependents_button = tk.Button(constraint_frame, text="Next", command=go_to_dependents_screen, width=30, **button_style)
+go_to_dependents_button.grid(row=constraint_row + 1, column=1, pady=10)
+
+# Go back button for the third window
+def go_back_to_scale_screen():
+    constraint_frame.pack_forget()  # Hide constraint selection frame
+    axis_scale_frame.pack(fill="both", expand=True)  # Show scale selection frame
+
+go_back_button = tk.Button(constraint_frame, text="Go Back", command=go_back_to_scale_screen, **button_style)
+go_back_button.grid(row=constraint_row + 1, column=0, pady=10, sticky="nsew")
+
+# Start with the first frame (axis frame)
+axis_scale_frame.pack(fill="both", expand=True)
+
+root.mainloop()
+#maybe negative m+ compared to m1?
+
+
+
+
+#Things on the dependents screen
+tk.Label(dependents_frame, text="Dependents Selection", font=("Arial", 16, "bold"), **label_style).grid(row=0, column=0, columnspan=2, pady=10, sticky="nsew")
+
+# Create checkboxes for each constraint group
+# Dictionary to store the checkbox variables
+checkbox_dependents = {}
+
+# Create checkboxes dynamically
+dependents_row = 1
+tk.Label(dependents_frame, text="Select Dependents", **label_style).grid(
+    row=dependents_row, column=0, columnspan=2, pady=10, sticky="nsew"
+)
+dependents_row += 1  # Increment row for next label
+for dependent in dependents[appliedConstraint]:
+    checkbox_dependents[dependent] = tk.BooleanVar()  # Create a BooleanVar for each dependent
+    checkbox = tk.Checkbutton(
+        dependents_frame,
+        text=dependent,  # Display user-friendly constraint name
+        variable=checkbox_dependents[dependent],
+        **label_style,  # Use the label_style for text colors
+        activebackground="#444444",
+        highlightbackground="#444444",
+        highlightcolor="#888888",
+        selectcolor="#4C9F70",
+    )
+    checkbox.grid(row=dependents_row, column=0, sticky="w", padx=10)
+    dependents_row += 1  # Increment row for the next checkbox
+
+
+#Function to update the displayed selections
 def update_selected_options(*args):
     selected_options_text.set(
         f"AXIS:\nX-axis: {x_axis.get()}\nY-axis: {y_axis.get()}\nZ-axis: {z_axis.get()}\n\n"
@@ -583,7 +664,7 @@ update_selected_options()  # Initial update when the window first loads
 # Display selected options from Axis and Scale
 selected_options_text = tk.StringVar(value=f"AXIS:\nX-axis: {x_axis.get()}\nY-axis: {y_axis.get()}\nZ-axis: {z_axis.get()}\n\nSCALE:\nX-scale: {x_scale.get()}\nY-scale: {y_scale.get()}\nZ-scale: {z_scale.get()}")
 # Display constraints based on groupings
-tk.Label(constraint_frame, textvariable=selected_options_text, **label_style).grid(row=1, column=2, rowspan=8, padx=10, sticky="w")
+tk.Label(dependents_frame, textvariable=selected_options_text, **label_style).grid(row=1, column=2, rowspan=8, padx=10, sticky="w")
 
 # Generate button for finalizing constraints
 def generate_selections():
@@ -618,79 +699,3 @@ def generatePlot(appliedConstraint):
 # Generate button
 generate_button = tk.Button(constraint_frame, text="Generate", command=generate_selections, width=30, **button_style)
 generate_button.grid(row=constraint_row + 1, column=1, pady=10)
-
-# Go back button for the third window
-def go_back_to_scale_screen():
-    constraint_frame.pack_forget()  # Hide constraint selection frame
-    axis_scale_frame.pack(fill="both", expand=True)  # Show scale selection frame
-
-go_back_button = tk.Button(constraint_frame, text="Go Back", command=go_back_to_scale_screen, **button_style)
-go_back_button.grid(row=constraint_row + 1, column=0, pady=10, sticky="nsew")
-
-# Start with the first frame (axis frame)
-axis_scale_frame.pack(fill="both", expand=True)
-
-root.mainloop()
-#maybe negative m+ compared to m1?
-
-
-
-
-
-
-
-# Create the dependents selection screen
-dependents_frame = tk.Frame(root, bg="#2E2E2E")
-
-#Things on the dependents screen
-tk.Label(dependents_frame, text="Dependents Selection", font=("Arial", 16, "bold"), **label_style).grid(row=0, column=0, columnspan=2, pady=10, sticky="nsew")
-
-# Create checkboxes for each constraint group
-# Dictionary to store the checkbox variables
-checkbox_dependents = {}
-
-# Create checkboxes dynamically
-dependents_row = 1
-tk.Label(dependents_frame, text="Select Dependents", **label_style).grid(
-    row=dependents_row, column=0, columnspan=2, pady=10, sticky="nsew"
-)
-dependents_row += 1  # Increment row for next label
-for dependent in dependents[appliedConstraint]:
-    checkbox_dependent[dependent] = tk.BooleanVar()  # Create a BooleanVar for each constraint
-    checkbox = tk.Checkbutton(
-        dependents_frame,
-        text=dependent,  # Display user-friendly constraint name
-        variable=checkbox_constraints[dependent],
-        **label_style,  # Use the label_style for text colors
-        activebackground="#444444",
-        highlightbackground="#444444",
-        highlightcolor="#888888",
-        selectcolor="#4C9F70",
-    )
-    checkbox.grid(row=dependents_row, column=0, sticky="w", padx=10)
-    dependents_row += 1  # Increment row for the next checkbox
-
-
-#Function to update the displayed selections
-def update_selected_options(*args):
-    selected_options_text.set(
-        f"AXIS:\nX-axis: {x_axis.get()}\nY-axis: {y_axis.get()}\nZ-axis: {z_axis.get()}\n\n"
-        f"SCALE:\nX-scale: {x_scale.get()}\nY-scale: {y_scale.get()}\nZ-scale: {z_scale.get()}"
-    )
-
-# Add trace to update selected options when any of the variables change
-x_axis.trace("w", update_selected_options)
-y_axis.trace("w", update_selected_options)
-z_axis.trace("w", update_selected_options)
-x_scale.trace("w", update_selected_options)
-y_scale.trace("w", update_selected_options)
-z_scale.trace("w", update_selected_options)
-
-# Initialize the selected_options_text
-selected_options_text = tk.StringVar()
-update_selected_options()  # Initial update when the window first loads
-
-# Display selected options from Axis and Scale
-selected_options_text = tk.StringVar(value=f"AXIS:\nX-axis: {x_axis.get()}\nY-axis: {y_axis.get()}\nZ-axis: {z_axis.get()}\n\nSCALE:\nX-scale: {x_scale.get()}\nY-scale: {y_scale.get()}\nZ-scale: {z_scale.get()}")
-# Display constraints based on groupings
-tk.Label(dependents_frame, textvariable=selected_options_text, **label_style).grid(row=1, column=2, rowspan=8, padx=10, sticky="w")

@@ -85,7 +85,7 @@ nf["T"] = (
     )
 )
 
-nf.loc[np.isclose(x1**2, x2**2, rtol=1e-4), 'S'] = np.nan #these points are too close to work, so we set the S to N/A, since it goes to infinty
+nf.loc[np.isclose(x1**2, x2**2, rtol=1e-4), 'S'] = 0 #these points are too close to work, so they go to 0
 #S will not plot NaN values
 
 
@@ -172,14 +172,10 @@ filtered_data = {}
 
 # Generate all possible cut combinations
 for r in range(1, len(individualCuts) + 1):  
-    print(r)
     for combo in combinations(individualCuts.keys(), r):
         cut_name = "".join(combo)
         cutList[cut_name] = individualCuts[combo[0]]
-        print("cut name: ", cut_name)
-        print("combo ", combo)
         for key in combo[1:]:
-            print("key ", key)
             cutList[cut_name] &= individualCuts[key]
         filtered_data[cut_name] = nf[cutList[cut_name]]
         
@@ -193,7 +189,6 @@ filtered_data["totpla"] = nf[cutList["totpla"]]
 cutList["totbao"] = cutList["tot"] & cutBAO
 filtered_data["totbao"] = nf[cutList["totbao"]]
 
-print(filtered_data.keys())
 #filtered_data takes the format "cutname":*df of that cut*
 
 #this part is for creating the titles inside the graphs.
@@ -206,12 +201,12 @@ cut_titles = {
 }
 
 # Initialize constraint_titles with the unfiltered data
-constraint_titles = {id(nf): "Unfiltered Data"}
+constraint_titles = {'nf': "Unfiltered Data"}
 
 # Handle special cases first
-constraint_titles[id(filtered_data["tot"])] = "All Constraints (with External Sources of DM) Applied"
-constraint_titles[id(filtered_data["totpla"])] = "All Constraints (with Planck) Applied"
-constraint_titles[id(filtered_data["totbao"])] = "All Constraints (with BAO) Applied"
+constraint_titles["tot"] = "All Constraints (with External Sources of DM) Applied"
+constraint_titles["totpla"] = "All Constraints (with Planck) Applied"
+constraint_titles["totbao"] = "All Constraints (with BAO) Applied"
 
 for cut_name, data in filtered_data.items():
     # Skip special cases already handled
@@ -223,7 +218,7 @@ for cut_name, data in filtered_data.items():
     
     # If cut_name is a single constraint (not combined)
     if cut_name in cut_titles:
-        constraint_titles[id(data)] = cut_titles[cut_name]
+        constraint_titles[cut_name] = cut_titles[cut_name]
     else:
         # For combinations, split and look for individual constraints
         for key in cut_titles.keys():
@@ -232,10 +227,11 @@ for cut_name, data in filtered_data.items():
         
         # If there are multiple labels, create a combined title
         if len(cut_labels) > 1:
-            constraint_titles[id(data)] = " + ".join(cut_labels) + " Constraints"
+            constraint_titles[cut_name] = " + ".join(cut_labels) + " Constraints"
         else:  # Single constraint case
-            constraint_titles[id(data)] = cut_titles[cut_name]
+            constraint_titles[cut_name] = cut_titles[cut_name]
 
+print(constraint_titles)
 
 
 # Initialize dependents dictionary with empty dependencies for unfiltered data
@@ -292,7 +288,7 @@ def plotCheck(scale, variable):
 titleSize = 20
 labelSize = 20
 pointSize = 1
-def startPlot(cut, x, y, z, i, j, k):
+def startPlot(cut, x, y, z, i, j, k, dependents):
     print("cut:", cut)
     if cut != 'nf':
         cut_plot = filtered_data[cut]
@@ -304,7 +300,7 @@ def startPlot(cut, x, y, z, i, j, k):
     # Add labels and title
     plt.xlabel(variableAxis.get(x), fontsize=labelSize)
     plt.ylabel(variableAxis.get(y), fontsize=labelSize)
-    plt.title(constraint_titles.get(id(cut)), fontsize=titleSize)
+    plt.title(constraint_titles[cut], fontsize=titleSize)
     plt.tight_layout()
 
     outputFormat = ''
@@ -323,28 +319,26 @@ def startPlot(cut, x, y, z, i, j, k):
     plt.savefig(cut+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
     plt.show()
     plt.close()
-    print("cut sample: \n", cut.sample(n=1))
-    print(dependents.get(cut))
-    if len(dependents.get(id(cut))) > 0:
-        for b in dependents.get(id(cut)):
-            print("Making: "+cut+"_"+variableNames.get(id(b))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf')
+    if len(dependents) > 0:
+        for b in dependents:
+            print("Making: "+b+"_"+cut)
             fig, ax = plt.subplots(figsize=(8, 6))
             sc1 = makePlot(ax, b, x, y, z, k , 0)
-            sc2 = makePlot(ax, cut, x, y, z, k)
-            makeAxis(x, i, y, j, z, sc2)
+        sc2 = makePlot(ax, cut, x, y, z, k)
+        makeAxis(x, i, y, j, z, sc2)
 
-            plt.xlabel(variableAxis.get(x), fontsize=labelSize)
-            plt.ylabel(variableAxis.get(y), fontsize=labelSize)
-            plt.legend(loc='upper left')
-            plt.title(constraint_titles.get(id(cut)), fontsize=titleSize)
-            plt.tight_layout()
+        plt.xlabel(variableAxis.get(x), fontsize=labelSize)
+        plt.ylabel(variableAxis.get(y), fontsize=labelSize)
+        plt.legend(loc='upper left')
+        plt.title(constraint_titles[cut], fontsize=titleSize)
+        plt.tight_layout()
 
-            # Save the plot to pdf format
+        # Save the plot to pdf format
 
-            #zs to stack
-            plt.savefig(cut+"_"+variableNames.get(id(b))+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
-            plt.show()
-            plt.close()
+        #zs to stack
+        plt.savefig(cut+"_"+dependents+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
+        plt.show()
+        plt.close()
         
 colors = [(0, 0, 1),  # Blue
           (0, 0, 0),  # Black
@@ -360,7 +354,7 @@ def makePlot(ax, dataset, x, y, z, k , colour = 1):
         if k == 'log':  #log colour map
             if z in {'l345', 'DM3'} : #lambda has negative numbers, so we make a new graph specifically for it
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
-                                cmap='seismic', norm=SymLogNorm(linthresh = 1e-5, vmin=dataset[z].min(),
+                                cmap='jet', norm=SymLogNorm(linthresh = 1e-5, vmin=dataset[z].min(), #maybe change the colour
                                 vmax=dataset[z].max()),s=pointSize, label=constraint_titles.get(id(dataset)))
             elif z == 'brH_DMDM': #branching ratio is sometimes 0, so we account for this
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
@@ -372,7 +366,7 @@ def makePlot(ax, dataset, x, y, z, k , colour = 1):
         else:   #linear colour map
             if z in {'l345', 'DM3'}:
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, 
-                        cmap='seismic', s=pointSize, label=constraint_titles.get(id(dataset)))
+                        cmap='jet', s=pointSize, label=constraint_titles.get(id(dataset))) #maybe change the colour
             else:
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, 
                         cmap='jet', s=pointSize, label=constraint_titles.get(id(dataset)))
@@ -617,7 +611,8 @@ def go_to_dependents_screen(): #this function is important for setting up the fi
     #perhaps later make the columns seperated by the number of constraints inside
 
     # Generate button
-    generate_button = tk.Button(dependents_frame, text="Generate", command=generate_selections(appliedConstraint, checkbox_dependents), width=30, **button_style)
+    generate_button = tk.Button(dependents_frame, text="Generate", command=lambda: generate_selections(appliedConstraint, checkbox_dependents, dependents_row), width=30, **button_style)
+    #lambda because you pass parameters
     back_to_scale_button = tk.Button(dependents_frame, text="Go Back", command=go_back_to_constraints, **button_style)
     if dependents_column < 1:
         generate_button.grid(row=dependents_row + 1, column=1, pady=10)
@@ -629,6 +624,7 @@ def go_to_dependents_screen(): #this function is important for setting up the fi
     print("checkbox_dependents: ",checkbox_dependents)
     constraint_frame.pack_forget()  # hides constraint selection frame
     dependents_frame.pack(fill="both", expand=True)    # shows dependents screen
+    return
     #update_selected_options_constraint(appliedConstraint)
 
 
@@ -694,29 +690,26 @@ def go_back_to_constraints():
 
 
 # Generate button for finalizing constraints
-def generate_selections(appliedConstraint, checkbox_dependents):
+def generate_selections(appliedConstraint, checkbox_dependents, dependents_row):
     #this first part is to get the name of the applied constraints
     selected_dependents = [cut for cut, var in checkbox_dependents.items() if var.get()]
-    print("selected_dependents", selected_dependents)
-
-
-    '''
+ 
     generating_label = tk.Label(dependents_frame, text="Making Plots... (check console)")
-    generating_label.grid(row=constraint_row+2, column=0, columnspan=2, pady=10)
+    generating_label.grid(row=dependents_row+2, column=0, columnspan=2, pady=10)
     dependents_frame.update()
 
-    generatePlot(appliedConstraint)
+    generatePlot(appliedConstraint, selected_dependents)
     generating_label.destroy()
-    dependents_frame.update()'''
+    dependents_frame.update()
 
-def generatePlot(appliedConstraint):
+def generatePlot(appliedConstraint, selected_dependents):
     for i in scales.get(x_scale.get()):
         if plotCheck(i, variables.get(x_axis.get())) == 1:
             for j in scales.get(y_scale.get()):
                 if plotCheck(j, variables.get(y_axis.get())) == 1:
                     for k in scales.get(z_scale.get()):
                         if plotCheck(k, variables.get(z_axis.get())) == 1:
-                            startPlot(appliedConstraint, variables.get(x_axis.get()), variables.get(y_axis.get()), variables.get(z_axis.get()), i, j, k)
+                            startPlot(appliedConstraint, variables.get(x_axis.get()), variables.get(y_axis.get()), variables.get(z_axis.get()), i, j, k, selected_dependents)
 
 
 

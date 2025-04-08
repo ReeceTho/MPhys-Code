@@ -36,8 +36,6 @@ if 'dependent_variables' in LZ:
         y_values = [point['value'] * conversion_factor for point in var['values']]
         y_data[name] = y_values
 
-
-
 # Changing for masses of neutral and charged
 nf["Mh+"] = nf["DMP"] + nf["MD1"]
 nf["Mh2"] = nf["DM3"] + nf["DMP"] + nf["MD1"]
@@ -289,19 +287,7 @@ titleSize = 20
 labelSize = 20
 pointSize = 1
 def startPlot(cut, x, y, z, i, j, k, dependents):
-    print("cut:", cut)
-    if cut != 'nf':
-        cut_plot = filtered_data[cut]
-    else:
-        cut_plot = nf
     fig, ax = plt.subplots(figsize=(8, 6))
-    sc = makePlot(ax, cut_plot, x, y, z, k)
-    makeAxis(x, i, y, j, z, sc)
-    # Add labels and title
-    plt.xlabel(variableAxis.get(x), fontsize=labelSize)
-    plt.ylabel(variableAxis.get(y), fontsize=labelSize)
-    plt.title(constraint_titles[cut], fontsize=titleSize)
-    plt.tight_layout()
 
     outputFormat = ''
     for l in [i, j, k]:
@@ -309,36 +295,49 @@ def startPlot(cut, x, y, z, i, j, k, dependents):
             outputFormat+='Lin'
         else:
             outputFormat+='Log'
+
+    if cut != 'nf':
+        cut_plot = filtered_data[cut]
+    else:
+        cut_plot = nf
+
+    dependent_colours = ['grey', 'lightgrey', 'darkgrey', 'slategrey', 'lightslategrey']
+    for a in range(0, len(dependents)):
+        print("Making: "+cut+'-d_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf')
+        if dependents[a] != 'nf':
+            a_plot = filtered_data[dependents[a]]
+        else:
+            a_plot = nf
+        print(dependents[a]+"_"+cut)
+        sc1 = makePlot(ax, dependents[a], a_plot, x, y, z, k , dependent_colours[a])
+    else:
+        print("Making: "+cut+"_"+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf')  
     
-    # Save  the plot to pdf format
-    print("Making: "+cut+"_"+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf')
+    sc = makePlot(ax, cut, cut_plot, x, y, z, k)
+    makeAxis(x, i, y, j, z, sc)
+
+    
+    plt.xlabel(variableAxis.get(x), fontsize=labelSize)
+    plt.ylabel(variableAxis.get(y), fontsize=labelSize)
+    plt.title(constraint_titles[cut], fontsize=titleSize)
+    plt.tight_layout()
+
+
     if str(x) == 'S' or str(x) == 'T':
         plt.xlim(-0.2, 0.3)
     if str(y) == 'S' or str(y) == 'T':
         plt.ylim(-0.1, 0.3)
-    plt.savefig(cut+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
+    
+    if len(dependents) > 0:
+        lgnd = ax.legend(loc="upper right")
+        for i in lgnd.legend_handles:
+            i._sizes = [20]
+        plt.savefig(cut+'-d_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
+    else:
+        plt.savefig(cut+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
     plt.show()
     plt.close()
-    if len(dependents) > 0:
-        for b in dependents:
-            print("Making: "+b+"_"+cut)
-            fig, ax = plt.subplots(figsize=(8, 6))
-            sc1 = makePlot(ax, b, x, y, z, k , 0)
-        sc2 = makePlot(ax, cut, x, y, z, k)
-        makeAxis(x, i, y, j, z, sc2)
 
-        plt.xlabel(variableAxis.get(x), fontsize=labelSize)
-        plt.ylabel(variableAxis.get(y), fontsize=labelSize)
-        plt.legend(loc='upper left')
-        plt.title(constraint_titles[cut], fontsize=titleSize)
-        plt.tight_layout()
-
-        # Save the plot to pdf format
-
-        #zs to stack
-        plt.savefig(cut+"_"+dependents+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
-        plt.show()
-        plt.close()
         
 colors = [(0, 0, 1),  # Blue
           (0, 0, 0),  # Black
@@ -349,27 +348,27 @@ cmap_name = "red_black_blue"
 custom_cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=256)
 
 
-def makePlot(ax, dataset, x, y, z, k , colour = 1):
+def makePlot(ax, key, dataset, x, y, z, k , colour = 1):
     if colour == 1:
         if k == 'log':  #log colour map
             if z in {'l345', 'DM3'} : #lambda has negative numbers, so we make a new graph specifically for it
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
                                 cmap='jet', norm=SymLogNorm(linthresh = 1e-5, vmin=dataset[z].min(), #maybe change the colour
-                                vmax=dataset[z].max()),s=pointSize, label=constraint_titles.get(id(dataset)))
+                                vmax=dataset[z].max()),s=pointSize, label=constraint_titles[key])
             elif z == 'brH_DMDM': #branching ratio is sometimes 0, so we account for this
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
                                 cmap='jet', norm=SymLogNorm(linthresh = 1e-20, vmin=dataset[z].min(), 
-                                vmax=dataset[z].max()),s=pointSize, label=constraint_titles.get(id(dataset)))
+                                vmax=dataset[z].max()),s=pointSize, label=constraint_titles[key])
             else: #for anything else
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, cmap='jet', norm=LogNorm(
-                    vmin=dataset[z].min(), vmax=dataset[z].max()),s=pointSize, label=constraint_titles.get(id(dataset)))
+                    vmin=dataset[z].min(), vmax=dataset[z].max()),s=pointSize, label=constraint_titles[key])
         else:   #linear colour map
             if z in {'l345', 'DM3'}:
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, 
-                        cmap='jet', s=pointSize, label=constraint_titles.get(id(dataset))) #maybe change the colour
+                        cmap='jet', s=pointSize, label=constraint_titles[key]) #maybe change the colour
             else:
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, 
-                        cmap='jet', s=pointSize, label=constraint_titles.get(id(dataset)))
+                        cmap='jet', s=pointSize, label=constraint_titles[key])
         if x == 'MD1' and y == 'protonSI': #add the LZ line for this graph
             for key, values in y_data.items():
                 ax.plot(x_values, y_data["limit"], label=key)
@@ -380,17 +379,14 @@ def makePlot(ax, dataset, x, y, z, k , colour = 1):
                                    cov_matrix(STpapers[paper][1], STpapers[paper][3], STpapers[paper][4]), 
                                    edgecolor = colours[paper], ax=ax, fill=True, alpha = .2, facecolor = colours[paper])
     else:
-        sc = ax.scatter(dataset[x], dataset[y], c='gray', s=pointSize, rasterized=True, label=constraint_titles.get(id(dataset)))
+        sc = ax.scatter(dataset[x], dataset[y], c=colour, s=pointSize, rasterized=True, label=constraint_titles[key])
         #different colours for different constraints?
     return sc
 
 def makeAxis(x, i, y, j, z, sc):
-    print("X = ",x)
-    print("Y = ",y)
     print(type(x))
     if x in {'l345', 'DM3'} and i == 'log':
         plt.xscale('symlog', linthresh = 1e-5)
-        print("This condition is met!!!! (X)")
     elif x == 'brH_DMDM' and i == 'log':
         plt.xscale('symlog', linthresh = 1e-20)
     else:
@@ -398,7 +394,6 @@ def makeAxis(x, i, y, j, z, sc):
 
     if y in {'l345', 'DM3'} and j == 'log':
         plt.yscale('symlog', linthresh = 1e-5)
-        print("This condition is met!!!! (Y)")
     elif y == 'brH_DMDM' and j == 'log':
         plt.yscale('symlog', linthresh = 1e-20)
     else:
@@ -449,8 +444,7 @@ variables = {
 }
 scales = {
     "Logarithmic": ['log'],
-    "Linear": ['linear'],
-    "Both": ['log', 'linear']
+    "Linear": ['linear']
 }
 constraint_selected = {
     "dd - Direct Detection of Dark Matter >5% P-value": filtered_data["dd"],
@@ -693,13 +687,15 @@ def go_back_to_constraints():
 def generate_selections(appliedConstraint, checkbox_dependents, dependents_row):
     #this first part is to get the name of the applied constraints
     selected_dependents = [cut for cut, var in checkbox_dependents.items() if var.get()]
- 
-    generating_label = tk.Label(dependents_frame, text="Making Plots... (check console)")
-    generating_label.grid(row=dependents_row+2, column=0, columnspan=2, pady=10)
-    dependents_frame.update()
-
-    generatePlot(appliedConstraint, selected_dependents)
-    generating_label.destroy()
+    if len(selected_dependents) > 5:
+        generating_label = tk.Label(dependents_frame, text="Cannot have more than 5 dependents in a plot")
+        generating_label.grid(row=dependents_row+2, column=0, columnspan=2, pady=10)
+    else:
+        generating_label = tk.Label(dependents_frame, text="Making Plots... (check console)")
+        generating_label.grid(row=dependents_row+2, column=0, columnspan=2, pady=10)
+        dependents_frame.update()
+        generatePlot(appliedConstraint, selected_dependents)
+        generating_label.destroy()
     dependents_frame.update()
 
 def generatePlot(appliedConstraint, selected_dependents):

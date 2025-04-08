@@ -7,6 +7,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import yaml
 import tkinter as tk
 from matplotlib.patches import Ellipse
+from matplotlib.colors import to_rgba
 from scipy.stats import chi2
 from scipy.spatial.distance import mahalanobis
 from itertools import combinations
@@ -91,18 +92,27 @@ nf.loc[np.isclose(x1**2, x2**2, rtol=1e-4), 'S'] = 0 #these points are too close
 S_central_2014, S_error_2014 = 0.06, 0.09
 T_central_2014, T_error_2014 = 0.1, 0.07
 Corr_ST_2014 = 0.91  #correlation between S and T
+Source_2014 = "The Gfitter Group - 2014"
 #https://arxiv.org/pdf/1803.01853
 S_central_2018, S_error_2018 = 0.04, 0.08
 T_central_2018, T_error_2018 = 0.08, 0.07
 Corr_ST_2018 = 0.92  #correlation between S and T
-#https://pdg.lbl.gov/2023/reviews/rpp2023-rev-standard-model.pdf
-S_central_2023, S_error_2023 = -0.01, 0.07
-T_central_2023, T_error_2023 = 0.04, 0.06
-Corr_ST_2023 = 0.92  #correlation between S and T
+Source_2018 = "The Gfitter Group - 2018"
+#https://academic.oup.com/ptep/article/2022/8/083C01/6651666?login=false
+S_central_2022, S_error_2022 = -0.01, 0.07
+T_central_2022, T_error_2022 = 0.04, 0.06
+Corr_ST_2022 = 0.92  #correlation between S and T
+Source_2022 = "Particle Data Group - 2022"
+#https://journals.aps.org/prd/pdf/10.1103/PhysRevD.110.030001 (pg 202)
+S_central_2024, S_error_2024 = -0.05, 0.07
+T_central_2024, T_error_2024 = 0.00, 0.06
+Corr_ST_2024 = 0.93  #correlation between S and T
+Source_2024 = "Particle Data Group - 2024"
 
-STpapers = [[S_central_2023, S_error_2023, T_central_2023, T_error_2023, Corr_ST_2023],
-            [S_central_2018, S_error_2018, T_central_2018, T_error_2018, Corr_ST_2018],
-            [S_central_2014, S_error_2014, T_central_2014, T_error_2014, Corr_ST_2014],     
+STpapers = [[S_central_2024, S_error_2024, T_central_2024, T_error_2024, Corr_ST_2024, Source_2024],
+            [S_central_2022, S_error_2022, T_central_2022, T_error_2022, Corr_ST_2022, Source_2022],
+            [S_central_2018, S_error_2018, T_central_2018, T_error_2018, Corr_ST_2018, Source_2018],
+            [S_central_2014, S_error_2014, T_central_2014, T_error_2014, Corr_ST_2014, Source_2014]    
 ]
 
 def cov_matrix(S_error, T_error, Corr_ST):
@@ -115,7 +125,7 @@ def confidence_ellipse(mean, cov, ax, n_std=2, **kwargs):
     width, height = 2 * np.sqrt(eigvals) * scale_factor
     ellipse = Ellipse(xy=mean, width=width, height=height, angle=angle, **kwargs)
     ax.add_patch(ellipse)
-
+    return ellipse
 # Inverse of covariance matrix for Mahalanobis distance calculation
 def cov_inv(cov_matrix):
     return np.linalg.inv(cov_matrix)
@@ -133,8 +143,8 @@ variableAxis = {
     'brH_DMDM' : r"Branching ratio",
     'Mh+' : r"$M_{h^+}$ / GeV",
     'Mh2' : r"$M_{h_2}$ / GeV",
-    'S' : r"EWPT S",
-    'T' : r"EWPT T"
+    'S' : r"S",
+    'T' : r"T"
 }
 
 #cutTest = (nf['DM3'] < 200) & (nf['DM3'] > -200)
@@ -152,7 +162,7 @@ cutBAO=(nf['Omegah2'] <= 0.12206) & (nf['Omegah2'] >= 0.1166) # based on BAO dat
 #MAKE ONE WITH 10%
 cutCMB=(nf['CMB_ID'] < 1)  
 cutLZ=(nf['protonSI'] < np.interp(nf['MD1'], x_values, y_data["limit"])) #this is to get all the points beneath the line
-cutEW = (np.array([mahalanobis([s, t], [S_central_2023, T_central_2023], cov_inv(cov_matrix(S_error_2023, T_error_2023, Corr_ST_2023))) for s, t in zip(nf['S'], nf['T'])]) <= np.sqrt(chi2.ppf(0.964, df=2)))
+cutEW = (np.array([mahalanobis([s, t], [S_central_2024, T_central_2024], cov_inv(cov_matrix(S_error_2024, T_error_2024, Corr_ST_2024))) for s, t in zip(nf['S'], nf['T'])]) <= np.sqrt(chi2.ppf(0.964, df=2)))
 #function LZ_2024, call it, compare number of exclusion.
 
 # Define individual cuts (excluding PLA and BAO as special cases)
@@ -320,7 +330,6 @@ def startPlot(cut, x, y, z, i, j, k, dependents):
     plt.xlabel(variableAxis.get(x), fontsize=labelSize)
     plt.ylabel(variableAxis.get(y), fontsize=labelSize)
     plt.title(constraint_titles[cut], fontsize=titleSize)
-    plt.tight_layout()
 
 
     if str(x) == 'S' or str(x) == 'T':
@@ -351,9 +360,13 @@ custom_cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=256)
 def makePlot(ax, key, dataset, x, y, z, k , colour = 1):
     if colour == 1:
         if k == 'log':  #log colour map
-            if z in {'l345', 'DM3'} : #lambda has negative numbers, so we make a new graph specifically for it
+            if z in {'l345'} : #lambda has negative numbers, so we make a new graph specifically for it
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
                                 cmap='jet', norm=SymLogNorm(linthresh = 1e-5, vmin=dataset[z].min(), #maybe change the colour
+                                vmax=dataset[z].max()),s=pointSize, label=constraint_titles[key])
+            elif z in {'DM3'} : #lambda has negative numbers, so we make a new graph specifically for it
+                sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
+                                cmap='jet', norm=SymLogNorm(linthresh = 1e-3, vmin=dataset[z].min(), #maybe change the colour
                                 vmax=dataset[z].max()),s=pointSize, label=constraint_titles[key])
             elif z == 'brH_DMDM': #branching ratio is sometimes 0, so we account for this
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
@@ -363,9 +376,13 @@ def makePlot(ax, key, dataset, x, y, z, k , colour = 1):
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, cmap='jet', norm=LogNorm(
                     vmin=dataset[z].min(), vmax=dataset[z].max()),s=pointSize, label=constraint_titles[key])
         else:   #linear colour map
-            if z in {'l345', 'DM3'}:
+            if z in {'l345'}:
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, 
                         cmap='jet', s=pointSize, label=constraint_titles[key]) #maybe change the colour
+            elif z in {'DM3'} : #lambda has negative numbers, so we make a new graph specifically for it
+                sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
+                                cmap='jet', norm=SymLogNorm(linthresh = 1e-3, vmin=dataset[z].min(), #maybe change the colour
+                                vmax=dataset[z].max()),s=pointSize, label=constraint_titles[key])
             else:
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, 
                         cmap='jet', s=pointSize, label=constraint_titles[key])
@@ -373,11 +390,20 @@ def makePlot(ax, key, dataset, x, y, z, k , colour = 1):
             for key, values in y_data.items():
                 ax.plot(x_values, y_data["limit"], label=key)
         if x == 'S' and y == 'T':
-            colours = ['red', 'blue', 'green']
+            colours = ['red', 'blue', 'green', 'yellow']
+            ellipse_handles = []
             for paper in range(0, len(STpapers)):  # plot 1st and 2nd standard deviation ellipses
-                confidence_ellipse([STpapers[paper][0], STpapers[paper][2]], 
-                                   cov_matrix(STpapers[paper][1], STpapers[paper][3], STpapers[paper][4]), 
-                                   edgecolor = colours[paper], ax=ax, fill=True, alpha = .2, facecolor = colours[paper])
+                mean = [STpapers[paper][0], STpapers[paper][2]]
+                cov = cov_matrix(STpapers[paper][1], STpapers[paper][3], STpapers[paper][4])
+                source = STpapers[paper][5]
+                ellipse = confidence_ellipse(mean, cov, ax=ax,
+                                    edgecolor = to_rgba(colours[paper], 0.5),
+                                    facecolor = to_rgba(colours[paper], 0.1),
+                                    label = source,
+                                    fill=True)
+                ellipse_handles.append(ellipse)
+                ax.scatter(mean[0], mean[1], color=colours[paper], marker='x', s=50, label=None, alpha=0.5)
+            ax.legend(handles = ellipse_handles, loc = 'lower right')
     else:
         sc = ax.scatter(dataset[x], dataset[y], c=colour, s=pointSize, rasterized=True, label=constraint_titles[key])
         #different colours for different constraints?
@@ -439,8 +465,8 @@ variables = {
     "brH_DMDM - Branching ratio": "brH_DMDM",
     "Mh+ - Mass of h+": "Mh+",
     "Mh2 - Mass of h2": "Mh2",
-    "S - EWPT S": "S",
-    "T - EWPT t": "T"
+    "S - S Parameter": "S",
+    "T - T Parameter": "T"
 }
 scales = {
     "Logarithmic": ['log'],

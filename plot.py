@@ -266,6 +266,7 @@ for cut_name in filtered_data.keys():
             
 # Special cases for tot, totpla, and totbao (tot depends on everything)
 total_dependents = list(filtered_data.keys())
+total_dependents.insert(0,"nf")
 del total_dependents[-3:] # removes the last 3 dictionary keys from filtered_data (tot, totpla, totbao)
 dependents["tot"] = total_dependents
 dependents["totpla"] = ["tot"]
@@ -381,8 +382,7 @@ def makePlot(ax, key, dataset, x, y, z, k , colour = 1):
                         cmap='jet', s=pointSize, label=constraint_titles[key]) #maybe change the colour
             elif z in {'DM3'} : #lambda has negative numbers, so we make a new graph specifically for it
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
-                                cmap='jet', norm=SymLogNorm(linthresh = 1e-3, vmin=dataset[z].min(), #maybe change the colour
-                                vmax=dataset[z].max()),s=pointSize, label=constraint_titles[key])
+                        cmap='jet', s=pointSize, label=constraint_titles[key])
             else:
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, 
                         cmap='jet', s=pointSize, label=constraint_titles[key])

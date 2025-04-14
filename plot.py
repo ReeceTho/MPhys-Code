@@ -40,6 +40,7 @@ if 'dependent_variables' in LZ:
 # Changing for masses of neutral and charged
 nf["Mh+"] = nf["DMP"] + nf["MD1"]
 nf["Mh2"] = nf["DM3"] + nf["DMP"] + nf["MD1"]
+nf.insert (3, "DM2", nf["DM3"] + nf["DMP"])
 
 def fa(x):
     y = -5 + (12*np.log(x))
@@ -133,6 +134,7 @@ def cov_inv(cov_matrix):
 variableAxis = {
     'MD1' : r"$M_{h_1}$ / (GeV)",
     'DMP' : r"$M_{h^+}-M_{h_1}$ / GeV",
+    'DM2' : r"$M_{h_2}-M_{h_1}$ / GeV",
     'DM3' : r"$M_{h_2}-M_{h^+}$ / GeV",
     'l345' : r"$\lambda_{345}$",
     'Omegah2' : r"$\Omega h^2$",
@@ -147,12 +149,7 @@ variableAxis = {
     'T' : r"T"
 }
 
-#cutTest = (nf['DM3'] < 200) & (nf['DM3'] > -200)
-#cutTest2 = (nf['DMP'] < 200) & (nf['DMP'] > -200)
-#cutTest3 = (nf["Mh+"] < 1000) & (nf["Mh2"] < 1000)
-#cutTest4 = (nf["S"] < 0.24) & (nf["S"] > -0.12) & (nf["T"] < 0.24) & (nf["T"] > -0.04)
-#nf['DM3'] = nf["DM3"]*-1
-#nf = nf[cutTest & cutTest2 & cutTest3]
+
 
 # Filter the DataFrame to include rows where PvalDD > 0.05
 cutDD=(nf['PvalDD'] > 0.046) # this means it matches to a percentage of 4.6% (2 sigma)
@@ -182,7 +179,7 @@ filtered_data = {}
 for r in range(1, len(individualCuts) + 1):  
     for combo in combinations(individualCuts.keys(), r):
         cut_name = "".join(combo)
-        cutList[cut_name] = individualCuts[combo[0]]
+        cutList[cut_name] = individualCuts[combo[0]].copy()
         for key in combo[1:]:
             cutList[cut_name] &= individualCuts[key]
         filtered_data[cut_name] = nf[cutList[cut_name]]
@@ -239,7 +236,44 @@ for cut_name, data in filtered_data.items():
         else:  # Single constraint case
             constraint_titles[cut_name] = cut_titles[cut_name]
 
-print(constraint_titles)
+cut_toppers = {
+    "dd": "DD >5% P-value",
+    "om": "Ωh²",
+    "cmb": "CMB",
+    "lz": "LZ-2024 DD",
+    "ew": "EW Precision"
+}
+
+# Initialize constraint_toppers with the unfiltered data
+constraint_toppers = {'nf': "Unfiltered Data"}
+
+# Handle special cases first
+constraint_toppers["tot"] = "All Constraints (with External Sources of DM) Applied"
+constraint_toppers["totpla"] = "All Constraints (with Planck) Applied"
+constraint_toppers["totbao"] = "All Constraints (with BAO) Applied"
+
+for cut_name, data in filtered_data.items():
+    # Skip special cases already handled
+    if cut_name in ["tot", "totpla", "totbao"]:
+        continue  # These are already handled above
+
+    # Check if the cut_name is a combination of multiple constraints
+    cut_labels = []
+    
+    # If cut_name is a single constraint (not combined)
+    if cut_name in cut_toppers:
+        constraint_toppers[cut_name] = cut_toppers[cut_name]
+    else:
+        # For combinations, split and look for individual constraints
+        for key in cut_toppers.keys():
+            if key in cut_name:
+                cut_labels.append(cut_toppers[key])
+        
+        # If there are multiple labels, create a combined title
+        if len(cut_labels) > 1:
+            constraint_toppers[cut_name] = " + ".join(cut_labels) + " Constraints"
+        else:  # Single constraint case
+            constraint_toppers[cut_name] = cut_toppers[cut_name]
 
 
 # Initialize dependents dictionary with empty dependencies for unfiltered data
@@ -294,12 +328,13 @@ def plotCheck(scale, variable):
     return 1
 
 # Fuction for creating plots
-titleSize = 20
-labelSize = 20
+titleSize = 24
+labelSize = 22
+axisSize = 17
 pointSize = 1
 def startPlot(cut, x, y, z, i, j, k, dependents):
-    fig, ax = plt.subplots(figsize=(8, 6))
-
+    fig, ax = plt.subplots(figsize=(11, 7))
+    
     outputFormat = ''
     for l in [i, j, k]:
         if l == 'linear':
@@ -313,24 +348,39 @@ def startPlot(cut, x, y, z, i, j, k, dependents):
         cut_plot = nf
 
     dependent_colours = ['grey', 'lightgrey', 'darkgrey', 'slategrey', 'lightslategrey']
+    if k == 'lin':
+        max = 0
+        min = 0
+    else:
+        max = 0
+        min = 1
     for a in range(0, len(dependents)):
         print("Making: "+cut+'-d_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf')
         if dependents[a] != 'nf':
             a_plot = filtered_data[dependents[a]]
         else:
             a_plot = nf
+        if a_plot[z].max() > max:
+            max = a_plot[z].max()
+        if a_plot[z].min() < min:
+            min = a_plot[z].min()
         print(dependents[a]+"_"+cut)
-        sc1 = makePlot(ax, dependents[a], a_plot, x, y, z, k , dependent_colours[a])
+        sc1 = makePlot(ax, dependents[a], a_plot, x, y, z, k , colour = dependent_colours[a])
+    if len(dependents) > 0:
+        sc = makePlot(ax, cut, cut_plot, x, y, z, k, max = max, min = min)
     else:
         print("Making: "+cut+"_"+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf')  
+        sc = makePlot(ax, cut, cut_plot, x, y, z, k, max = cut_plot[z].max(), min = cut_plot[z].min())
     
-    sc = makePlot(ax, cut, cut_plot, x, y, z, k)
     makeAxis(x, i, y, j, z, sc)
 
     
     plt.xlabel(variableAxis.get(x), fontsize=labelSize)
     plt.ylabel(variableAxis.get(y), fontsize=labelSize)
-    plt.title(constraint_titles[cut], fontsize=titleSize)
+    plt.title(constraint_toppers[cut], fontsize=titleSize)
+    plt.xticks(fontsize=axisSize)
+    plt.yticks(fontsize=axisSize)
+    
 
 
     if str(x) == 'S' or str(x) == 'T':
@@ -347,6 +397,7 @@ def startPlot(cut, x, y, z, i, j, k, dependents):
         plt.savefig(cut+'_'+str(x)+str(y)+str(z)+'_'+outputFormat+'.pdf', format='pdf')
     plt.show()
     plt.close()
+    print(cut_plot.sample())
 
         
 colors = [(0, 0, 1),  # Blue
@@ -358,34 +409,34 @@ cmap_name = "red_black_blue"
 custom_cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=256)
 
 
-def makePlot(ax, key, dataset, x, y, z, k , colour = 1):
+def makePlot(ax, key, dataset, x, y, z, k , max=1, min=1, colour = 1):
     if colour == 1:
         if k == 'log':  #log colour map
             if z in {'l345'} : #lambda has negative numbers, so we make a new graph specifically for it
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
-                                cmap='jet', norm=SymLogNorm(linthresh = 1e-5, vmin=dataset[z].min(), #maybe change the colour
-                                vmax=dataset[z].max()),s=pointSize, label=constraint_titles[key])
+                                cmap='jet', norm=SymLogNorm(linthresh = 1e-5, vmin=min, #maybe change the colour
+                                vmax=max),s=pointSize, label=constraint_titles[key])
             elif z in {'DM3'} : #lambda has negative numbers, so we make a new graph specifically for it
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
-                                cmap='jet', norm=SymLogNorm(linthresh = 1e-3, vmin=dataset[z].min(), #maybe change the colour
-                                vmax=dataset[z].max()),s=pointSize, label=constraint_titles[key])
+                                cmap='jet', norm=SymLogNorm(linthresh = 1e-2, vmin=min, #maybe change the colour
+                                vmax=max),s=pointSize, label=constraint_titles[key])
             elif z == 'brH_DMDM': #branching ratio is sometimes 0, so we account for this
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
-                                cmap='jet', norm=SymLogNorm(linthresh = 1e-20, vmin=dataset[z].min(), 
-                                vmax=dataset[z].max()),s=pointSize, label=constraint_titles[key])
+                                cmap='jet', norm=SymLogNorm(linthresh = 1e-20, vmin=min, 
+                                vmax=max),s=pointSize, label=constraint_titles[key])
             else: #for anything else
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, cmap='jet', norm=LogNorm(
-                    vmin=dataset[z].min(), vmax=dataset[z].max()),s=pointSize, label=constraint_titles[key])
+                    vmin=min, vmax=max),s=pointSize, label=constraint_titles[key])
         else:   #linear colour map
             if z in {'l345'}:
-                sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, 
-                        cmap='jet', s=pointSize, label=constraint_titles[key]) #maybe change the colour
+                sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, vmin=min,
+                        vmax = max, cmap='jet', s=pointSize, label=constraint_titles[key]) #maybe change the colour
             elif z in {'DM3'} : #lambda has negative numbers, so we make a new graph specifically for it
-                sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
-                        cmap='jet', s=pointSize, label=constraint_titles[key])
+                sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, vmin=min,
+                        vmax = max, cmap='jet', s=pointSize, label=constraint_titles[key])
             else:
-                sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, 
-                        cmap='jet', s=pointSize, label=constraint_titles[key])
+                sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, vmin=min,
+                        vmax = max, cmap='jet', s=pointSize, label=constraint_titles[key])
         if x == 'MD1' and y == 'protonSI': #add the LZ line for this graph
             for key, values in y_data.items():
                 ax.plot(x_values, y_data["limit"], label=key)
@@ -426,7 +477,8 @@ def makeAxis(x, i, y, j, z, sc):
         plt.yscale(j)
 
     cbar = plt.colorbar(sc)
-    cbar.set_label(variableAxis.get(z), fontsize=14)
+    cbar.set_label(variableAxis.get(z), fontsize=labelSize)
+    cbar.ax.tick_params(labelsize=axisSize)
 
 
 
@@ -455,6 +507,7 @@ label_style = {'bg': '#2E2E2E', 'fg': 'white'}
 variables = {
     "MD1 : Mass of h1": "MD1",
     "DMP : Mh+ - Mh1": "DMP",
+    "DM2 : Mh2 - Mh1": "DM2",
     "DM3 : Mh2 - Mh+": "DM3",
     "l345 : Coupling strength": "l345",
     "Omegah2 - Relic density": "Omegah2", 

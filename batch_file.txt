@@ -1,0 +1,74 @@
+Model:         i2HDM-DeltaM
+Model changed: True
+Gauge:         Feynman
+#Process:   p,p->~h1,~h1 #this is pointless, because you don't find this at LHC
+Process:   p,p->~h1,~h2
+#2-body final state
+Decay:     W->le,n
+Decay:	   ~h2->2*X
+
+Composite: p=u,U,d,D,s,S,c,C,b,B,G
+Composite: W=W+,W-
+Composite: le=e,E,m,M
+Composite: n=ne,Ne,nm,Nm
+Composite: jet=u,U,d,D,s,S,c,C,b,B,G
+
+
+pdf1:      PDT:cteq6l1(proton)
+pdf2:      PDT:cteq6l1(proton)
+p1:        6800
+p2:        6800
+
+Filename:                        p,p->~h1,~h2
+NTuple:                          False
+Cleanup:                         False
+Parallelization method:      local
+
+nSess_1:   5
+nCalls_1:  100000
+nSess_2:   5
+nCalls_2:  100000
+
+
+
+
+
+
+
+
+
+
+
+Model:         i2HDM_DM
+Model changed: True
+Gauge:         Feynman
+Process:   p,p->~h1,~h2
+ 
+Composite: p=u,U,d,D,s,S,c,C,b,B,G
+ 
+pdf1:      PDT:cteq6l1(proton)
+pdf2:      PDT:cteq6l1(proton)
+p1:        6800
+p2:        6800
+ 
+Parameter: DMP=0
+ 
+Run parameter: Mh1
+Run begin:     10
+Run step size: 20
+Run n steps:   3
+ 
+Run parameter: DM3
+Run begin:     10
+Run step size: 20
+Run n steps:   3
+ 
+ 
+Filename:                        pp-h1h2
+NTuple:                          False
+Cleanup:                         False
+Max number of nodes:   8
+nSess_1:   5
+nCalls_1:  1000
+nSess_2:   5
+nCalls_2:  1000

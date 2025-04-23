@@ -15,7 +15,7 @@ from collections import defaultdict
 import math
 
 # Specify the path to your file
-file_path = 'scan.dat.gz' 
+file_path = 'scan_fixed.dat.gz' 
 yaml_file = "SI_WS2022+WS2024.yaml" 
 
 # Read the file into a pandas DataFrame; you can use .gz format to save space
@@ -41,6 +41,8 @@ if 'dependent_variables' in LZ:
 nf["Mh+"] = nf["DMP"] + nf["MD1"]
 nf["Mh2"] = nf["DM3"] + nf["DMP"] + nf["MD1"]
 nf.insert (3, "DM2", nf["DM3"] + nf["DMP"])
+nf["f"] = (nf["CMB_ID"] * nf["MD1"]) / nf["sigV"]
+print(nf["f"], nf["CMB_ID"])
 
 def fa(x):
     y = -5 + (12*np.log(x))
@@ -143,7 +145,7 @@ variableAxis = {
     'PvalDD' : r"Pval - Direct Detection",
     'CMB_ID' : r"CMB - Indirect Detection",
     'brH_DMDM' : r"Branching ratio",
-    'Mh+' : r"$M_{h^+}$ / GeV",
+    'Mh+' : r"$M_{h^\pm}$ / GeV",
     'Mh2' : r"$M_{h_2}$ / GeV",
     'S' : r"S",
     'T' : r"T"
@@ -153,9 +155,9 @@ variableAxis = {
 
 # Filter the DataFrame to include rows where PvalDD > 0.05
 cutDD=(nf['PvalDD'] > 0.046) # this means it matches to a percentage of 4.6% (2 sigma)
-cutOM=(nf['Omegah2'] < 0.1236)
-cutPLA=(nf['Omegah2'] <= 0.1236) & (nf['Omegah2'] >= 0.1164)
-cutBAO=(nf['Omegah2'] <= 0.12206) & (nf['Omegah2'] >= 0.1166) # based on BAO data from Planck
+cutOM=(nf['Omegah2'] < 0.1224)
+cutPLA=(nf['Omegah2'] <= 0.1224) & (nf['Omegah2'] >= 0.1186)
+cutBAO=(nf['Omegah2'] <= 0.12115) & (nf['Omegah2'] >= 0.11751) # based on BAO data from Planck
 #MAKE ONE WITH 10%
 cutCMB=(nf['CMB_ID'] < 1)  
 cutLZ=(nf['protonSI'] < np.interp(nf['MD1'], x_values, y_data["limit"])) #this is to get all the points beneath the line
@@ -169,6 +171,7 @@ individualCuts = {
     "cmb": cutCMB,
     "lz": cutLZ,
     "ew": cutEW,
+    "bao": cutBAO,
 }
 
 # Dictionary to store cut masks and filtered data
@@ -189,10 +192,9 @@ for r in range(1, len(individualCuts) + 1):
 cutList["tot"] = cutList["ddomcmblzew"]
 filtered_data["tot"] = nf[cutList["tot"]]
 del filtered_data["ddomcmblzew"] #this delete
-cutList["totpla"] = cutList["tot"] & cutPLA
-filtered_data["totpla"] = nf[cutList["totpla"]]
-cutList["totbao"] = cutList["tot"] & cutBAO
+cutList["totbao"] = cutList["ddomcmblzewbao"]
 filtered_data["totbao"] = nf[cutList["totbao"]]
+del filtered_data["ddomcmblzewbao"] #this delete
 
 #filtered_data takes the format "cutname":*df of that cut*
 
@@ -202,7 +204,8 @@ cut_titles = {
     "om": "Planck Ωh² Constraint",
     "cmb": "CMB Constraint",
     "lz": "LUX-ZEPLIN 2024",
-    "ew": "Electroweak Precision"
+    "ew": "Electroweak Precision",
+    "bao": "BAO Data"
 }
 
 # Initialize constraint_titles with the unfiltered data
@@ -241,7 +244,8 @@ cut_toppers = {
     "om": "Ωh²",
     "cmb": "CMB",
     "lz": "LZ-2024 DD",
-    "ew": "EW Precision"
+    "ew": "EW Precision",
+    "bao": "BAO Data"
 }
 
 # Initialize constraint_toppers with the unfiltered data
@@ -387,7 +391,11 @@ def startPlot(cut, x, y, z, i, j, k, dependents):
         plt.xlim(-0.2, 0.3)
     if str(y) == 'S' or str(y) == 'T':
         plt.ylim(-0.1, 0.3)
-    
+        
+    #if str(x) == 'MD1' and str(y) == 'l345':
+    #    plt.xlim(10, 200)
+
+    plt.grid()
     if len(dependents) > 0:
         lgnd = ax.legend(loc="upper right")
         for i in lgnd.legend_handles:
@@ -416,24 +424,28 @@ def makePlot(ax, key, dataset, x, y, z, k , max=1, min=1, colour = 1):
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
                                 cmap='jet', norm=SymLogNorm(linthresh = 1e-5, vmin=min, #maybe change the colour
                                 vmax=max),s=pointSize, label=constraint_titles[key])
+            elif z in {'MD1', 'Mh2', 'Mh+'} : #fixing the plot
+                sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, cmap='jet', norm=LogNorm(
+                                vmin=10, vmax=max), s=pointSize, label=constraint_titles[key])
             elif z in {'DM3'} : #lambda has negative numbers, so we make a new graph specifically for it
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
                                 cmap='jet', norm=SymLogNorm(linthresh = 1e-2, vmin=min, #maybe change the colour
                                 vmax=max),s=pointSize, label=constraint_titles[key])
             elif z == 'brH_DMDM': #branching ratio is sometimes 0, so we account for this
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True,
-                                cmap='jet', norm=SymLogNorm(linthresh = 1e-20, vmin=min, 
+                                cmap='jet', norm=SymLogNorm(linthresh = 1e-20, vmin=0, 
                                 vmax=max),s=pointSize, label=constraint_titles[key])
             else: #for anything else
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, cmap='jet', norm=LogNorm(
-                    vmin=min, vmax=max),s=pointSize, label=constraint_titles[key])
+                                vmin=min, vmax=max),s=pointSize, label=constraint_titles[key])
         else:   #linear colour map
-            if z in {'l345'}:
+            if z in {'l345', 'DM3'}:
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, vmin=min,
-                        vmax = max, cmap='jet', s=pointSize, label=constraint_titles[key]) #maybe change the colour
-            elif z in {'DM3'} : #lambda has negative numbers, so we make a new graph specifically for it
-                sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, vmin=min,
+                        vmax = max, cmap='jet', s=pointSize, label=constraint_titles[key]) #here if you want another colour for negatives
+            elif z in {'MD1'} : #fixing the plot
+                sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, vmin=10,
                         vmax = max, cmap='jet', s=pointSize, label=constraint_titles[key])
+            
             else:
                 sc = ax.scatter(dataset[x], dataset[y], c=dataset[z], rasterized=True, vmin=min,
                         vmax = max, cmap='jet', s=pointSize, label=constraint_titles[key])
@@ -462,17 +474,23 @@ def makePlot(ax, key, dataset, x, y, z, k , max=1, min=1, colour = 1):
 
 def makeAxis(x, i, y, j, z, sc):
     print(type(x))
-    if x in {'l345', 'DM3'} and i == 'log':
+    if x in {'l345'} and i == 'log':
         plt.xscale('symlog', linthresh = 1e-5)
+    elif x in {'DM3'} and i == 'log':
+        plt.xscale('symlog', linthresh = 1e-3)
     elif x == 'brH_DMDM' and i == 'log':
         plt.xscale('symlog', linthresh = 1e-20)
+        plt.xlim(bottom=0)
     else:
         plt.xscale(i)
 
-    if y in {'l345', 'DM3'} and j == 'log':
+    if y in {'l345'} and j == 'log':
         plt.yscale('symlog', linthresh = 1e-5)
+    elif y in {'DM3'} and i == 'log':
+        plt.yscale('symlog', linthresh = 1e-3)
     elif y == 'brH_DMDM' and j == 'log':
         plt.yscale('symlog', linthresh = 1e-20)
+        plt.ylim(bottom=-0.5e-20)
     else:
         plt.yscale(j)
 
@@ -531,6 +549,7 @@ constraint_selected = {
     "cmb - CMB": filtered_data["cmb"],
     "lz - LUX-ZEPLIN 2024": filtered_data["lz"],
     "ew - Electroweak Precision": filtered_data["ew"],  
+    "bao - BAO Data": filtered_data["totbao"]
 }
 
 ########## AXIS SELECTION SCREEN ##########
@@ -646,12 +665,14 @@ def go_to_dependents_screen(): #this function is important for setting up the fi
     appliedConstraint = ''
     # Collect selected constraints
     if len(selected_constraints) == len(cut_titles):
-        appliedConstraint = "tot"
+        appliedConstraint = "totbao"
     elif len(selected_constraints) == 0:
         appliedConstraint = "nf"
     else:
         for i in selected_constraints:
             appliedConstraint += i
+    if appliedConstraint == "ddomcmblzew":
+        appliedConstraint = "tot"
 
     # this part makes the list of dependents based on the user's input
     checkbox_dependents = {}# Dictionary to store the checkbox variables

@@ -89,9 +89,11 @@ int main(int argc,char** argv)
  
 /* ================the new ppiece of code starts here =================*/
    int a=0,n_points=10000;
-   double MD1,ld345,DMP,DM3,DM2,ld=1,protonSI,Omh2,sigV,PvalDD,CMB_ID;
-   char* expDD; 
- 
+   double MD1,ld345,DMP,DM3,DM2,ld,protonSI,Omh2,sigV,PvalDD,CMB_ID,MW, MZ, MH;
+   char* expDD;
+   MW = 80.3692;
+   MZ = 91.188;
+   MH = 125.2;
                                 
   FILE *fscan = fopen("scan.dat","w"); 
   fprintf(fscan,"%s %s %s %s %s %s %s %s %s %s %s %s \n", 
@@ -105,6 +107,7 @@ double MD1_min  =1,  MD1_max  =1e+4;
 double DMP_min  =1e-4, DMP_max  =1e+3; //DMP=Mh+-Mh1
 double DM2_min  =1e-4,  DM2_max  =1e+3; //introducing DM2 which is Mh2-Mh1
 double ld345_min=-10 ,  ld345_max=10;
+double ld_min = 1e-4, ld_max = 10;
 
 // Initialize the random seed using the current time
 srand(time(NULL));
@@ -114,11 +117,13 @@ for (;;) { /* remember to close the loop in the end! */
 	DM2 = rnd_lin(DM2_min,DM2_max); /* DM2 is just a MD2-MD1 mass difference, which I conver to DM3 value below */
  	ld345 = rnd_lin(ld345_min,ld345_max);
 	DM3=DM2-DMP;  /* Note that Mh2-Mh+ =  DM2-DMP */
+    ld = rnd_slg(ld_min, ld_max);
 
       printf("\n MD1=%.20E    \n",MD1);
       printf("DMP=%.20E    \n",DMP);
       printf("DM3=%.20E    \n",DM3);
       printf("ld345=%.20E    \n",ld345);
+      printf("ld=%.20E    \n", ld);
 
 	
 	

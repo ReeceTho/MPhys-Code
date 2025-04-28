@@ -16,7 +16,7 @@ from collections import defaultdict
 import math
 
 # Specify the path to your file
-file_path = 'scan_fixed.dat.gz' 
+file_path = 'scan.dat.gz' 
 yaml_file = "SI_WS2022+WS2024.yaml" 
 
 # Read the file into a pandas DataFrame; you can use .gz format to save space
@@ -43,6 +43,7 @@ nf["Mh+"] = nf["DMP"] + nf["MD1"]
 nf["Mh2"] = nf["DM3"] + nf["DMP"] + nf["MD1"]
 nf.insert (3, "DM2", nf["DM3"] + nf["DMP"])
 nf["f"] = (nf["CMB_ID"] * nf["MD1"]) / nf["sigV"]
+nf["R"] = (nf["l345"] / (2*np.sqrt(0.129*nf["ld"])))
 print(nf["f"], nf["CMB_ID"])
 
 def fa(x):
@@ -61,7 +62,7 @@ def f_c(x,y):
     return ((x + y) / 2) - ((x * y) / (x - y)) * np.log(x / y)
     
 alpha = 1/137 #fine structure constant,  = e**2/(4 * pi * epsilon_0 * h_bar * c)
-nu = 246 #Vacuum expectation value
+nu = 246.11 #Vacuum expectation value
 
 x1 = nf["MD1"]/nf["Mh+"]
 x2 = nf["Mh2"]/nf["Mh+"]
@@ -165,7 +166,9 @@ cutCMB=(nf['CMB_ID'] < 1)
 cutLZ=(nf['protonSI'] < np.interp(nf['MD1'], x_values, y_data["limit"])) #this is to get all the points beneath the line
 cutEW = (np.array([mahalanobis([s, t], [S_central_2024, T_central_2024], cov_inv(cov_matrix(S_error_2024, T_error_2024, Corr_ST_2024))) for s, t in zip(nf['S'], nf['T'])]) <= np.sqrt(chi2.ppf(0.964, df=2)))
 jet_conditions = (nf['MD1'] < 80) & (nf['Mh2'] < 100) & (nf['DM2'] > 8)
-cutLEP = ((nf['MD1'] + nf["Mh+"]) > 80.3825) & ((nf['MD1'] + nf["Mh2"]) > 91.19) & ((nf["Mh+"] + nf["Mh+"]) > 91.19) & (~jet_conditions)
+cutLEP = ((nf['MD1'] + nf["Mh+"]) > 80.3825) & ((nf['MD1'] + nf["Mh2"]) > 91.19) & ((nf["Mh+"] + nf["Mh+"]) > 91.19) & (~jet_conditions) & (nf["Mh+"]>70)
+vac_conditions = (nf["R"] > 1) & ((nf["MD1"]**2) < ((nf["R"]-1)*((nu**2)*np.sqrt(0.129*nf["ld"]))))
+cutVAC = (nf["R"]>-1) & (nf["l345"] < (2*(((nf['MD1']**2)/(nu**2))+np.sqrt(0.129*4.1887902)))) & (-1.47<nf["l345"]) & ((-2*np.sqrt(0.129*4.1887902))<nf["l345"]) & (~vac_conditions)
 #function LZ_2024, call it, compare number of exclusion.
 
 # Define individual cuts (excluding PLA and EX as special cases)
@@ -176,6 +179,7 @@ individualCuts = {
     "lz": cutLZ,
     "ew": cutEW,
     "lep": cutLEP,
+    "vac": cutVAC,
     "ex": cutEX,
 }
 
@@ -194,12 +198,12 @@ for r in range(1, len(individualCuts) + 1):
         
 
 # Special cases for tot, totpla, and totex
-cutList["tot"] = cutList["ddomcmblzewlep"]
+cutList["tot"] = cutList["ddomcmblzewlepvac"]
 filtered_data["tot"] = nf[cutList["tot"]]
-del filtered_data["ddomcmblzewlep"] #this delete
-cutList["totex"] = cutList["ddomcmblzewlepex"]
+del filtered_data["ddomcmblzewlepvac"] #this delete
+cutList["totex"] = cutList["ddomcmblzewlepvacex"]
 filtered_data["totex"] = nf[cutList["totex"]]
-del filtered_data["ddomcmblzewlepex"] #this delete
+del filtered_data["ddomcmblzewlepvacex"] #this delete
 
 #filtered_data takes the format "cutname":*df of that cut*
 
@@ -211,7 +215,8 @@ cut_titles = {
     "lz": "LUX-ZEPLIN 2024",
     "ew": "Electroweak Precision",
     "lep": "LEP Constraint",
-    "ex": "Exact Planck"
+    "vac": "Vacuum Perturbativity",
+    "ex": "Exact Planck",
 }
 
 # Initialize constraint_titles with the unfiltered data
@@ -252,7 +257,8 @@ cut_toppers = {
     "lz": "LZ-2024 DD",
     "ew": "EW Precision",
     "lep": "LEP Constraints",
-    "ex": "Ωh²=0.12"
+    "vac": "VP",
+    "ex": "Ωh²=0.12",
 }
 
 # Initialize constraint_toppers with the unfiltered data
@@ -293,7 +299,6 @@ dependents = {"nf": []}
 # Define the basic cut names (for dependency checking)
 
 for cut_name in filtered_data.keys():
-    print("cut_name: ", cut_name)
     cut_dependencies = ["nf"]  # Every cut depends on nf
     single_dependents = []
 
@@ -346,6 +351,10 @@ pointSize = 1
 
 def startPlot(cut, x, y, z, i, j, k, dependents):
     fig, ax = plt.subplots(figsize=(11, 8),constrained_layout=True)
+
+    print("cut: ", cut)
+    if cut != "nf":
+        print("cut length: ", filtered_data[cut].shape[0])
     
     outputFormat = ''
     for l in [i, j, k]:
@@ -383,9 +392,9 @@ def startPlot(cut, x, y, z, i, j, k, dependents):
     if cut == 'totex':
         plot_colour = 'red'
 
-    #elif x in {'MD1','Mh+','Mh2'} and y in {'MD1','Mh+','Mh2'}:
-    #    plot_colour = 'red'
-    #    print("THIS IS TRUE!")
+    elif x in {'MD1','Mh+','Mh2'} and y in {'MD1','Mh+','Mh2'}:
+        plot_colour = 'red'
+        print("THIS IS TRUE!")
 
     else:
         plot_colour = 1
@@ -508,12 +517,12 @@ def makeAxis(x, i, y, j, z, sc, cut):
     elif x in {'DM3'} and i == 'log':
         plt.xscale('symlog', linthresh = 1e-3)
     elif x == 'brH_DMDM' and i == 'log':
-        plt.xscale('symlog', linthresh = 1e-20)
+        plt.xscale('symlog', linthresh = 1e-18)
         plt.xlim(bottom=0)
     else:
         plt.xscale(i)
-    if x in {"MD1", "Mh2", "Mh+"}:
-        plt.xlim(1e1-0.2e1, 1e4+0.2e4)
+    #if x in {"MD1", "Mh2", "Mh+"}:
+    #    plt.xlim(1e1-0.2e1, 1e4+0.2e4)
     
 
     if y in {'l345'} and j == 'log':
@@ -521,29 +530,28 @@ def makeAxis(x, i, y, j, z, sc, cut):
     elif y in {'DM3'} and i == 'log':
         plt.yscale('symlog', linthresh = 1e-3)
     elif y == 'brH_DMDM' and j == 'log':
-        plt.yscale('symlog', linthresh = 1e-20)
+        plt.yscale('symlog', linthresh = 1e-18)
         plt.ylim(-0.5e-20, 1)
-        if x == 'MD1':
+        if x == 'MD1' and i == 'linear':
             plt.xlim(9, 63)
     else:
         plt.yscale(j)
-    if y in {"MD1", "Mh2", "Mh+"}:
-        plt.ylim(1e1-0.2e1, 1e4+0.2e4)
+    #if y in {"MD1", "Mh2", "Mh+"}:
+    #    plt.ylim(1e1-0.2e1, 1e4+0.2e4)
     
-    if x == "MD1" and y == "l345":
-        plt.ylim(-1.5, 3)
-        plt.xlim(10,300)
+    #if x == "MD1" and y == "l345":
+    #    plt.ylim(-1.5, 3)
+    #    plt.xlim(10,300)
+
 
     if cut != 'totex':
         cbar = plt.colorbar(sc)
         cbar.set_label(variableAxis.get(z), fontsize=labelSize)
         cbar.ax.tick_params(labelsize=axisSize)
 
-low = 500
-for i in filtered_data["tot"]["MD1"]:
-    if i < low and i > 100:
-        low = i
-print("lowest = ", low)
+
+print(filtered_data["totex"][filtered_data["totex"]["MD1"] < 100])
+#filtered_data["tot"].to_csv('scan_tot.dat', sep='\t', index=False)
 
 
 
@@ -597,6 +605,7 @@ constraint_selected = {
     "lz - LUX-ZEPLIN 2024": filtered_data["lz"],
     "ew - Electroweak Precision": filtered_data["ew"],  
     "lep - LEP Constraint": filtered_data["lep"],
+    "vac - Vacuum Perturbitivity": filtered_data["vac"],
     "ex - Exact Ωh²": filtered_data["totex"]
 }
 
@@ -738,7 +747,7 @@ def go_to_dependents_screen(): #this function is important for setting up the fi
     else:
         for i in selected_constraints:
             appliedConstraint += i
-    if appliedConstraint == "ddomcmblzewlep":
+    if appliedConstraint == "ddomcmblzewlepvac":
         appliedConstraint = "tot"
 
     # this part makes the list of dependents based on the user's input
